@@ -1,6 +1,22 @@
 <?php
 declare(strict_types=1);
 
+// Shared hosting can keep its complete legacy production configuration in
+// config/private.php. This file is intentionally ignored by Git so a deploy
+// cannot replace production database credentials with the MAMP defaults.
+$privateConfigFile = __DIR__ . '/private.php';
+if (is_file($privateConfigFile)) {
+    require $privateConfigFile;
+
+    // Older production configuration files predate optional LINE login.
+    defined('LINE_CHANNEL_ID') || define('LINE_CHANNEL_ID', '');
+    defined('LINE_CHANNEL_SECRET') || define('LINE_CHANNEL_SECRET', '');
+    defined('LINE_REDIRECT_URI') || define('LINE_REDIRECT_URI', rtrim(APP_URL, '/') . '/auth/line_callback.php');
+
+    date_default_timezone_set('Asia/Bangkok');
+    return;
+}
+
 const APP_NAME = 'SENA Learning';
 const APP_TAGLINE = 'ระบบจัดการเรียนรู้ สกร.ระดับอำเภอเสนา';
 define('APP_URL', rtrim((string) (

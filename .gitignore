@@ -1,6 +1,7 @@
 .DS_Store
 
 # Local/production secrets
+config/private.php
 config/student_api.php
 config/learning_api.php
 config/oauth.php
@@ -16,4 +17,3 @@ storage/certificates/**
 output*.html
 test_*.php
 test_*.html
-

@@ -69,6 +69,10 @@
 
 ### Student API บน shared hosting
 
+หาก production มี `config/private.php` ระบบจะโหลดไฟล์นี้ก่อนค่า MAMP ใน
+`config/config.php` เสมอ ไฟล์ private จะไม่ถูก commit ขึ้น Git และต้องเก็บไว้บน
+เซิร์ฟเวอร์เมื่อ deploy ระบบรอบถัดไป
+
 การเข้าสู่ระบบนักศึกษา ศกร. ต้องอัปโหลด `config/student_api.php` ไปพร้อมระบบ
 ไฟล์นี้เก็บ URL และ API key สำหรับเรียก `sena_care_school` จากฝั่ง server โดยไม่
 ต้องตั้ง environment variable ใน nginx หรือ PHP-FPM
