@@ -2059,6 +2059,28 @@ a:hover > .auth-site-logo {
     padding: 6px 8px;
 }
 
+.learner-access-badge {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    display: inline-flex;
+    font-size: 0.7rem;
+    font-weight: 900;
+    line-height: 1;
+    padding: 6px 9px;
+}
+
+.learner-access-badge.is-public {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #047857;
+}
+
+.learner-access-badge.is-locked {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+}
+
 .learner-status-learning {
     background: #e2f9ed;
     color: #087a49;

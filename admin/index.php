@@ -197,6 +197,7 @@ render_header('หลังบ้าน', 'admin');
                         <th>บทเรียน / สื่อ</th>
                         <th>ชุดข้อสอบ</th>
                         <th>ผู้เรียน</th>
+                        <th>การเข้าเรียน</th>
                         <th>เผยแพร่</th>
                         <th class="admin-course-actions-head">จัดการ</th>
                     </tr>
@@ -220,6 +221,11 @@ render_header('หลังบ้าน', 'admin');
                             <td><span class="admin-metric-pill"><?= (int) $course['lesson_count'] ?></span></td>
                             <td><span class="admin-metric-pill"><?= (int) $course['quiz_set_count'] ?></span></td>
                             <td><span class="admin-metric-pill is-learner"><?= (int) $course['learner_count'] ?></span></td>
+                            <td>
+                                <span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-extrabold <?= course_is_public($course) ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-blue-200 bg-blue-50 text-blue-700' ?>">
+                                    <?= e(course_access_label((string) ($course['access_mode'] ?? ''))) ?>
+                                </span>
+                            </td>
                             <td>
                                 <form method="post" class="admin-publish-form">
                                     <input type="hidden" name="action" value="toggle_course_publish">

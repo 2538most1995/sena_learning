@@ -14,6 +14,7 @@ $course = [
     'pass_percent' => 80,
     'allow_retake' => 0,
     'certificate_title' => 'เกียรติบัตรการผ่านหลักสูตร',
+    'access_mode' => 'login_required',
     'is_published' => 1,
 ];
 $courseCategories = course_categories();
@@ -34,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             (float) post('pass_percent', 80),
             isset($_POST['allow_retake']) ? 1 : 0,
             trim((string) post('certificate_title')),
+            normalize_course_access_mode((string) post('access_mode')),
             isset($_POST['is_published']) ? 1 : 0,
         ];
 
@@ -45,15 +47,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt = db()->prepare(
                 'UPDATE courses
-                 SET title = ?, description = ?, category = ?, cover_url = ?, pass_percent = ?, allow_retake = ?, certificate_title = ?, is_published = ?
+                 SET title = ?, description = ?, category = ?, cover_url = ?, pass_percent = ?, allow_retake = ?, certificate_title = ?, access_mode = ?, is_published = ?
                  WHERE id = ?'
             );
             $stmt->execute([...$data, $id]);
             flash('บันทึกหลักสูตรแล้ว');
         } else {
             $stmt = db()->prepare(
-                'INSERT INTO courses (title, description, category, cover_url, pass_percent, allow_retake, certificate_title, is_published)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO courses (title, description, category, cover_url, pass_percent, allow_retake, certificate_title, access_mode, is_published)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $stmt->execute($data);
             $id = (int) db()->lastInsertId();
@@ -120,6 +122,19 @@ render_header($id > 0 ? 'แก้ไขหลักสูตร' : 'เพิ�
                 <label class="text-sm font-bold text-slate-700" for="certificate_title">ชื่อบนเกียรติบัตร</label>
                 <input id="certificate_title" name="certificate_title" required value="<?= e($course['certificate_title']) ?>" class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-sm focus:border-sea focus:outline-none focus:ring-4 focus:ring-teal-100">
             </div>
+            <fieldset class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <legend class="px-1 text-sm font-extrabold text-slate-800">สิทธิ์การเข้าเรียน</legend>
+                <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                    <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-emerald-200 bg-white p-4 text-sm text-slate-700">
+                        <input type="radio" name="access_mode" value="public" required class="mt-0.5 text-sea focus:ring-sea" <?= normalize_course_access_mode((string) ($course['access_mode'] ?? '')) === 'public' ? 'checked' : '' ?>>
+                        <span><strong class="block text-slate-900">สาธารณะ</strong><small class="mt-1 block leading-5 text-slate-500">ไม่ต้องล็อกอิน ผู้เรียนกรอกชื่อ–นามสกุลเพื่อออกเกียรติบัตร</small></span>
+                    </label>
+                    <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-blue-200 bg-white p-4 text-sm text-slate-700">
+                        <input type="radio" name="access_mode" value="login_required" required class="mt-0.5 text-sea focus:ring-sea" <?= normalize_course_access_mode((string) ($course['access_mode'] ?? '')) === 'login_required' ? 'checked' : '' ?>>
+                        <span><strong class="block text-slate-900">ต้องเข้าสู่ระบบ</strong><small class="mt-1 block leading-5 text-slate-500">เฉพาะผู้มีบัญชีหรือนักศึกษาที่ผ่านการเข้าสู่ระบบ</small></span>
+                    </label>
+                </div>
+            </fieldset>
             <label class="flex items-center gap-3 text-sm font-bold text-slate-700">
                 <input type="checkbox" name="is_published" value="1" class="rounded text-sea focus:ring-sea" <?= (int) $course['is_published'] === 1 ? 'checked' : '' ?>>
                 เปิดเผยแพร่หลักสูตร

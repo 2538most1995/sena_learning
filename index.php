@@ -12,9 +12,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 $loggedInUser = current_user();
-if (!$loggedInUser) {
-    redirect('auth/login.php');
-}
 ensure_learning_access_columns();
 ensure_curriculum_tables();
 
@@ -60,8 +57,12 @@ $courses = $courseStmt->fetchAll();
 $totalCourses = count($allCourses);
 $visibleCourseCount = count($courses);
 $hasCourseFilters = $courseSearch !== '' || $selectedCategory !== '';
-$userAttempts = latest_user_attempts_by_course((int) $loggedInUser['id']);
-$certificateAttempts = user_certificate_attempts_by_course((int) $loggedInUser['id']);
+$userAttempts = $loggedInUser
+    ? latest_user_attempts_by_course((int) $loggedInUser['id'])
+    : session_guest_attempts();
+$certificateAttempts = $loggedInUser
+    ? user_certificate_attempts_by_course((int) $loggedInUser['id'])
+    : session_guest_attempts(true);
 $courseProgress = [];
 $courseStats = [];
 $coursesById = [];
@@ -85,8 +86,14 @@ $progressPercent = $totalCourses > 0 ? (int) round(array_sum($courseProgress) / 
 $personalCompleted = count(array_filter($userAttempts, fn (array $attempt): bool => $attempt['status'] === 'passed'));
 $personalInProgress = count($userAttempts) - $personalCompleted;
 $personalNotStarted = max(0, $totalCourses - count($userAttempts));
-$learnerTypeLabel = $loggedInUser['user_type'] === 'student' ? 'นักศึกษา ศกร.' : 'ประชาชนทั่วไป';
-$learnerInitial = mb_substr((string) $loggedInUser['display_name'], 0, 1, 'UTF-8');
+$publicCourseCount = count(array_filter($allCourses, 'course_is_public'));
+$restrictedCourseCount = $totalCourses - $publicCourseCount;
+$learnerTypeLabel = $loggedInUser
+    ? ($loggedInUser['user_type'] === 'student' ? 'นักศึกษา ศกร.' : 'ประชาชนทั่วไป')
+    : 'เข้าชมโดยไม่ต้องล็อกอิน';
+$learnerInitial = $loggedInUser
+    ? mb_substr((string) $loggedInUser['display_name'], 0, 1, 'UTF-8')
+    : 'S';
 $thumbs = ['thumb-green', 'thumb-blue', 'thumb-amber', 'thumb-rose'];
 
 function learner_course_status(?array $attempt): array
@@ -132,18 +139,20 @@ render_header('หน้าเรียน', 'learn');
             <div class="learner-welcome">
                 <div class="learner-avatar"><?= e($learnerInitial) ?></div>
                 <div>
-                    <p class="learner-eyebrow">พื้นที่การเรียนรู้ของคุณ</p>
-                    <h1>ยินดีต้อนรับ, <?= e((string) $loggedInUser['display_name']) ?></h1>
+                    <p class="learner-eyebrow"><?= $loggedInUser ? 'พื้นที่การเรียนรู้ของคุณ' : 'คลังการเรียนรู้ SENA Learning' ?></p>
+                    <h1><?= $loggedInUser ? 'ยินดีต้อนรับ, ' . e((string) $loggedInUser['display_name']) : 'หลักสูตรทั้งหมด' ?></h1>
                     <span class="learner-account-badge"><?= e($learnerTypeLabel) ?></span>
-                    <p class="learner-welcome-copy">เลือกหลักสูตรที่สนใจและเรียนต่อจากจุดเดิม ระบบจะบันทึกผลการเรียนและเกียรติบัตรไว้ในบัญชีนี้เท่านั้น</p>
+                    <p class="learner-welcome-copy"><?= $loggedInUser
+                        ? 'เลือกหลักสูตรที่สนใจและเรียนต่อจากจุดเดิม ระบบจะบันทึกผลการเรียนและเกียรติบัตรไว้ในบัญชีนี้เท่านั้น'
+                        : 'เลือกเรียนหลักสูตรสาธารณะได้ทันทีโดยกรอกชื่อ–นามสกุล ส่วนหลักสูตรสมาชิกจะต้องเข้าสู่ระบบก่อน' ?></p>
                 </div>
             </div>
 
             <div class="learner-overview">
                 <div class="learner-ring" style="--value: <?= $progressPercent ?>%">
                     <div>
-                        <strong><?= $progressPercent ?>%</strong>
-                        <span>คืบหน้าโดยรวม</span>
+                        <strong><?= $loggedInUser ? $progressPercent . '%' : $totalCourses ?></strong>
+                        <span><?= $loggedInUser ? 'คืบหน้าโดยรวม' : 'หลักสูตรทั้งหมด' ?></span>
                     </div>
                 </div>
                 <div class="learner-stats">
@@ -151,22 +160,22 @@ render_header('หน้าเรียน', 'learn');
                         <span class="learner-stat-icon learner-stat-completed">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12 3 3 7-7"/><circle cx="12" cy="12" r="9"/></svg>
                         </span>
-                        <strong><?= $personalCompleted ?></strong>
-                        <span>เรียนจบแล้ว</span>
+                        <strong><?= $loggedInUser ? $personalCompleted : $publicCourseCount ?></strong>
+                        <span><?= $loggedInUser ? 'เรียนจบแล้ว' : 'เรียนได้ทันที' ?></span>
                     </div>
                     <div class="learner-stat">
                         <span class="learner-stat-icon learner-stat-learning">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v17H6.5A2.5 2.5 0 0 0 4 22V5.5ZM20 5.5A2.5 2.5 0 0 0 17.5 3H13v17h4.5A2.5 2.5 0 0 1 20 22V5.5Z"/></svg>
                         </span>
-                        <strong><?= $personalInProgress ?></strong>
-                        <span>กำลังเรียน</span>
+                        <strong><?= $loggedInUser ? $personalInProgress : $restrictedCourseCount ?></strong>
+                        <span><?= $loggedInUser ? 'กำลังเรียน' : 'สำหรับสมาชิก' ?></span>
                     </div>
                     <div class="learner-stat">
                         <span class="learner-stat-icon learner-stat-waiting">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
                         </span>
-                        <strong><?= $personalNotStarted ?></strong>
-                        <span>ยังไม่ได้เริ่ม</span>
+                        <strong><?= $loggedInUser ? $personalNotStarted : count($userAttempts) ?></strong>
+                        <span><?= $loggedInUser ? 'ยังไม่ได้เริ่ม' : 'ประวัติในเบราว์เซอร์นี้' ?></span>
                     </div>
                 </div>
             </div>
@@ -220,8 +229,8 @@ render_header('หน้าเรียน', 'learn');
             <div class="learner-section-heading">
                 <div>
                     <p class="learner-eyebrow">คลังการเรียนรู้</p>
-                    <h2>หลักสูตรของคุณ</h2>
-                    <p>เลือกวิชาที่ต้องการเริ่มเรียน หรือกลับมาเรียนต่อจากความคืบหน้าล่าสุด</p>
+                    <h2>หลักสูตรทั้งหมด</h2>
+                    <p>เลือกหลักสูตรที่สนใจ ระบบจะแจ้งชัดเจนว่าเรียนได้ทันทีหรือต้องเข้าสู่ระบบ</p>
                 </div>
                 <span class="learner-course-count">
                     <?= $hasCourseFilters ? $visibleCourseCount . ' จาก ' . $totalCourses : $totalCourses ?> หลักสูตร
@@ -268,6 +277,7 @@ render_header('หน้าเรียน', 'learn');
                     $certificateAttempt = $certificateAttempts[$courseId] ?? null;
                     $rowProgress = $courseProgress[$courseId] ?? 0;
                     [$statusText, $statusClass] = learner_course_status($attempt);
+                    $isPublicCourse = course_is_public($course);
                     ?>
                     <article class="learner-course-card">
                         <div class="course-thumb <?= empty($course['cover_url']) ? e($thumbs[$index % count($thumbs)]) : 'has-cover-image' ?>">
@@ -280,7 +290,7 @@ render_header('หน้าเรียน', 'learn');
                         <div class="learner-course-body">
                             <div class="learner-course-topline">
                                 <span class="learner-status learner-status-<?= e($statusClass) ?>"><?= e($statusText) ?></span>
-                                <span class="learner-progress-percent"><?= $rowProgress ?>%</span>
+                                <span class="learner-access-badge <?= $isPublicCourse ? 'is-public' : 'is-locked' ?>"><?= e(course_access_label((string) ($course['access_mode'] ?? ''))) ?></span>
                             </div>
                             <span class="learner-category-badge"><?= e(course_category_label((string) ($course['category'] ?? ''))) ?></span>
                             <h3><?= e((string) $course['title']) ?></h3>
@@ -293,10 +303,16 @@ render_header('หน้าเรียน', 'learn');
                             <div class="learner-progress"><span style="width: <?= $rowProgress ?>%"></span></div>
                             <div class="learner-course-actions">
                                 <?php if (!$attempt): ?>
-                                    <form action="start.php" method="post">
-                                        <input type="hidden" name="course_id" value="<?= $courseId ?>">
-                                        <button class="learner-btn learner-btn-outline">เริ่มเรียน</button>
-                                    </form>
+                                    <?php if ($loggedInUser): ?>
+                                        <form action="start.php" method="post">
+                                            <input type="hidden" name="course_id" value="<?= $courseId ?>">
+                                            <button class="learner-btn learner-btn-outline">เริ่มเรียน</button>
+                                        </form>
+                                    <?php elseif ($isPublicCourse): ?>
+                                        <a class="learner-btn learner-btn-outline" href="start.php?course_id=<?= $courseId ?>">กรอกชื่อและเริ่มเรียน</a>
+                                    <?php else: ?>
+                                        <a class="learner-btn learner-btn-primary" href="auth/login.php">เข้าสู่ระบบเพื่อเริ่มเรียน</a>
+                                    <?php endif; ?>
                                 <?php else: ?>
                                     <a class="learner-btn learner-btn-outline" href="<?= e(learner_continue_url($attempt)) ?>"><?= $attempt['status'] === 'passed' ? 'ดูผลการเรียน' : 'เรียนต่อ' ?></a>
                                 <?php endif; ?>
@@ -304,10 +320,14 @@ render_header('หน้าเรียน', 'learn');
                                     <a class="learner-btn learner-btn-certificate" href="<?= e(attempt_url('certificate.php', $certificateAttempt)) ?>">เปิดเกียรติบัตร</a>
                                 <?php endif; ?>
                                 <?php if ($attempt && $attempt['status'] === 'passed' && (int) $course['allow_retake'] === 1): ?>
-                                    <form action="start.php" method="post">
-                                        <input type="hidden" name="course_id" value="<?= $courseId ?>">
-                                        <button class="learner-btn learner-btn-muted">เรียนซ้ำ</button>
-                                    </form>
+                                    <?php if ($loggedInUser): ?>
+                                        <form action="start.php" method="post">
+                                            <input type="hidden" name="course_id" value="<?= $courseId ?>">
+                                            <button class="learner-btn learner-btn-muted">เรียนซ้ำ</button>
+                                        </form>
+                                    <?php else: ?>
+                                        <a class="learner-btn learner-btn-muted" href="start.php?course_id=<?= $courseId ?>">เรียนซ้ำ</a>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </div>

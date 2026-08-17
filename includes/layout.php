@@ -164,7 +164,7 @@ function render_footer(): void
                 <p>© 2026 <?= APP_NAME ?> สงวนลิขสิทธิ์</p>
                 <div class="flex flex-wrap gap-x-4 gap-y-1 sm:gap-x-6">
                     <span class="min-w-0">เรียนได้ทุกอุปกรณ์</span>
-                    <span class="min-w-0">เข้าสู่ระบบก่อนเข้าเรียน</span>
+                    <span class="min-w-0">มีทั้งหลักสูตรสาธารณะและสำหรับสมาชิก</span>
                     <span class="min-w-0">ออกเกียรติบัตรเมื่อผ่านเกณฑ์</span>
                 </div>
             </div>

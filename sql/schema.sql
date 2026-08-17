@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS courses (
     shuffle_pre_choices TINYINT(1) NOT NULL DEFAULT 0,
     shuffle_post_choices TINYINT(1) NOT NULL DEFAULT 0,
     certificate_title VARCHAR(255) NOT NULL DEFAULT 'เกียรติบัตรการผ่านหลักสูตร',
+    access_mode VARCHAR(20) NOT NULL DEFAULT 'login_required',
     is_published TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

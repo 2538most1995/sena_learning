@@ -237,6 +237,23 @@ function course_category_label(?string $category): string
     return course_categories()[$category];
 }
 
+function normalize_course_access_mode(?string $accessMode): string
+{
+    return $accessMode === 'public' ? 'public' : 'login_required';
+}
+
+function course_access_label(?string $accessMode): string
+{
+    return normalize_course_access_mode($accessMode) === 'public'
+        ? 'สาธารณะ'
+        : 'ต้องเข้าสู่ระบบ';
+}
+
+function course_is_public(array $course): bool
+{
+    return normalize_course_access_mode((string) ($course['access_mode'] ?? '')) === 'public';
+}
+
 function update_course_publish_status(int $courseId, bool $isPublished): string
 {
     if ($courseId <= 0) {
@@ -349,7 +366,6 @@ function get_attempt(int $attemptId): ?array
 
 function require_attempt(): array
 {
-    $user = require_user();
     $attemptId = get_int('attempt');
     $token = (string) ($_GET['token'] ?? '');
 
@@ -359,13 +375,24 @@ function require_attempt(): array
     }
 
     $stmt = db()->prepare(
-        'SELECT a.*, c.title AS course_title, c.description AS course_description, c.pass_percent, c.certificate_title, c.allow_retake
+        'SELECT a.*, c.title AS course_title, c.description AS course_description, c.pass_percent, c.certificate_title, c.allow_retake, c.access_mode
          FROM attempts a
          INNER JOIN courses c ON c.id = a.course_id
-         WHERE a.id = ? AND a.access_token = ? AND a.user_id = ?'
+         WHERE a.id = ? AND a.access_token = ?'
     );
-    $stmt->execute([$attemptId, $token, (int) $user['id']]);
+    $stmt->execute([$attemptId, $token]);
     $attempt = $stmt->fetch();
+
+    if ($attempt && $attempt['user_id'] !== null) {
+        $user = current_user();
+        if (!$user || (int) $attempt['user_id'] !== (int) $user['id']) {
+            $attempt = false;
+        }
+    } elseif ($attempt) {
+        if (!course_is_public($attempt) || !guest_attempt_is_remembered($attemptId, $token)) {
+            $attempt = false;
+        }
+    }
 
     if (!$attempt) {
         flash('ลิงก์การเข้าเรียนไม่ถูกต้องหรือหมดอายุ', 'error');
@@ -458,6 +485,111 @@ function get_or_create_attempt(int $courseId, int $userId, string $learnerName):
     return get_attempt((int) $pdo->lastInsertId());
 }
 
+function remember_guest_attempt(array $attempt): void
+{
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    $attemptId = (int) ($attempt['id'] ?? 0);
+    $token = (string) ($attempt['access_token'] ?? '');
+    if ($attemptId > 0 && $token !== '') {
+        $_SESSION['guest_attempt_tokens'][$attemptId] = $token;
+    }
+}
+
+function guest_attempt_is_remembered(int $attemptId, string $token): bool
+{
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    $remembered = (string) ($_SESSION['guest_attempt_tokens'][$attemptId] ?? '');
+    return $remembered !== '' && hash_equals($remembered, $token);
+}
+
+function session_guest_attempts(bool $certificatesOnly = false): array
+{
+    ensure_learning_access_columns();
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    $tokens = $_SESSION['guest_attempt_tokens'] ?? [];
+    if (!is_array($tokens) || $tokens === []) {
+        return [];
+    }
+
+    $ids = array_values(array_filter(array_map('intval', array_keys($tokens)), static fn (int $id): bool => $id > 0));
+    if ($ids === []) {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $certificateSql = $certificatesOnly ? ' AND a.certificate_code IS NOT NULL' : '';
+    $stmt = db()->prepare(
+        "SELECT a.*, c.title AS course_title, c.pass_percent, c.certificate_title, c.allow_retake, c.access_mode
+         FROM attempts a
+         INNER JOIN courses c ON c.id = a.course_id
+         WHERE a.user_id IS NULL AND c.access_mode = 'public' AND a.id IN ({$placeholders}){$certificateSql}
+         ORDER BY a.created_at DESC, a.id DESC"
+    );
+    $stmt->execute($ids);
+
+    $attempts = [];
+    foreach ($stmt->fetchAll() as $attempt) {
+        $attemptId = (int) $attempt['id'];
+        $rememberedToken = (string) ($tokens[$attemptId] ?? '');
+        if ($rememberedToken === '' || !hash_equals($rememberedToken, (string) $attempt['access_token'])) {
+            continue;
+        }
+        $courseId = (int) $attempt['course_id'];
+        if (!isset($attempts[$courseId])) {
+            $attempts[$courseId] = $attempt;
+        }
+    }
+
+    return $attempts;
+}
+
+function get_or_create_guest_attempt(int $courseId, string $learnerName): array
+{
+    ensure_learning_access_columns();
+    $course = fetch_course($courseId);
+    if (!$course || !course_is_public($course)) {
+        throw new RuntimeException('หลักสูตรนี้ต้องเข้าสู่ระบบก่อนเริ่มเรียน');
+    }
+
+    $learnerName = preg_replace('/\s+/u', ' ', trim($learnerName)) ?: '';
+    if (mb_strlen($learnerName, 'UTF-8') < 3 || mb_strlen($learnerName, 'UTF-8') > 255 || !preg_match('/\S+\s+\S+/u', $learnerName)) {
+        throw new RuntimeException('กรุณากรอกชื่อและนามสกุลให้ครบถ้วน เพื่อใช้ออกเกียรติบัตร');
+    }
+
+    $latest = session_guest_attempts()[$courseId] ?? null;
+    if ($latest && trim((string) $latest['learner_name']) === $learnerName) {
+        if ($latest['status'] !== 'passed') {
+            return $latest;
+        }
+        if ((int) $latest['allow_retake'] !== 1) {
+            throw new RuntimeException('หลักสูตรนี้ไม่เปิดให้เรียนซ้ำ คุณสามารถเปิดดูผลการเรียนเดิมได้');
+        }
+    }
+
+    $token = generate_token(12);
+    $stmt = db()->prepare(
+        'INSERT INTO attempts (course_id, user_id, learner_name, access_token, status)
+         VALUES (?, NULL, ?, ?, "registered")'
+    );
+    $stmt->execute([$courseId, $learnerName, $token]);
+    $attempt = get_attempt((int) db()->lastInsertId());
+    if (!$attempt) {
+        throw new RuntimeException('ไม่สามารถสร้างรายการเข้าเรียนได้');
+    }
+    remember_guest_attempt($attempt);
+
+    return $attempt;
+}
+
 function latest_user_attempts_by_course(int $userId): array
 {
     ensure_learning_access_columns();
@@ -507,8 +639,13 @@ function certificate_attempt_for_attempt(array $attempt): ?array
     if (!empty($attempt['certificate_code'])) {
         return $attempt;
     }
-    if (empty($attempt['user_id']) || empty($attempt['course_id'])) {
+    if (empty($attempt['course_id'])) {
         return null;
+    }
+
+    if (empty($attempt['user_id'])) {
+        $attempts = session_guest_attempts(true);
+        return $attempts[(int) $attempt['course_id']] ?? null;
     }
 
     $attempts = user_certificate_attempts_by_course((int) $attempt['user_id']);
@@ -2003,6 +2140,9 @@ function ensure_learning_access_columns(): void
     }
     if (!database_column_exists('courses', 'category')) {
         db()->exec("ALTER TABLE courses ADD category VARCHAR(60) NOT NULL DEFAULT 'lifelong' AFTER description");
+    }
+    if (!database_column_exists('courses', 'access_mode')) {
+        db()->exec("ALTER TABLE courses ADD access_mode VARCHAR(20) NOT NULL DEFAULT 'login_required' AFTER certificate_title");
     }
 
     $checked = true;

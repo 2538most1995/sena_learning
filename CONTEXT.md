@@ -2,7 +2,7 @@
 
 ## Purpose
 
-SENA Learning is a member-only learning web application for local MAMP hosting. Learners sign in before starting a course, complete learning activities, and receive a certificate after passing.
+SENA Learning is a learning web application for local MAMP hosting. The home page lists all published courses. Each course can be public or limited to signed-in members. Public learners enter their full name before starting and receive a certificate after passing.
 
 Administrators manage courses, course covers, lessons, questions, learners, scores, and certificate layouts.
 
@@ -56,7 +56,7 @@ public certificate URL for passed courses.
 | Route | Responsibility |
 | --- | --- |
 | `index.php` | Landing page, course list, cover thumbnails, progress summary |
-| `start.php` | Resume or create a learner attempt for the signed-in user |
+| `start.php` | Resume/create a member attempt or collect a public learner's full name and create a session-bound guest attempt |
 | `quiz.php` | Render and score pre-tests or post-tests |
 | `lesson.php` | Render lessons and enforce tracked-video completion |
 | `mark_lesson.php` | Record lesson completion through JSON POST |
@@ -89,6 +89,7 @@ Stores course metadata:
 - `shuffle_pre_choices`, `shuffle_post_choices`
 - `certificate_title`
 - `allow_retake`
+- `access_mode`: `public` or `login_required`
 - `is_published`
 
 `cover_url` accepts either an external URL or a local relative upload path.
@@ -116,7 +117,7 @@ Stores pre-test and post-test questions:
 
 ### `attempts`
 
-Stores learner sessions linked to `users.id`:
+Stores learner sessions. Member attempts link to `users.id`; public attempts use a null `user_id` and are bound to the learner's browser session plus access token:
 
 - user id, learner name, and access token
 - pre-test and post-test scores
