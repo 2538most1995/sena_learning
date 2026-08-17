@@ -1,0 +1,19 @@
+.DS_Store
+
+# Local/production secrets
+config/student_api.php
+config/learning_api.php
+config/oauth.php
+
+# Runtime data and user uploads
+storage/uploads/**
+storage/certificates/**
+!storage/uploads/.gitkeep
+!storage/certificates/.gitkeep
+
+# Local browser/test artifacts
+.playwright-cli/
+output*.html
+test_*.php
+test_*.html
+
