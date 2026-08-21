@@ -1264,6 +1264,278 @@ a:hover > .auth-site-logo {
     font-weight: 900;
 }
 
+.admin-user-result-summary {
+    color: #64748b;
+    font-size: 0.82rem;
+    font-weight: 700;
+    margin: 0 0 14px;
+    padding: 0 2px;
+}
+
+.admin-user-result-summary strong {
+    color: #0f766e;
+    font-size: 0.96rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 900;
+}
+
+.admin-user-detail-card,
+.admin-user-list-panel {
+    background: #ffffff;
+    border: 1px solid #dbe5ef;
+    border-radius: 8px;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+    overflow: hidden;
+}
+
+.admin-user-detail-card {
+    margin-bottom: 18px;
+    scroll-margin-top: 90px;
+}
+
+.admin-user-detail-header {
+    align-items: flex-start;
+    background: linear-gradient(135deg, #ecfdf5 0%, #f0f9ff 58%, #fff7ed 100%);
+    border-bottom: 1px solid #dbe5ef;
+    display: flex;
+    gap: 20px;
+    justify-content: space-between;
+    padding: 22px;
+}
+
+.admin-user-detail-kicker,
+.admin-user-course-category {
+    color: #0f766e;
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 900;
+    line-height: 1.35;
+}
+
+.admin-user-detail-header h2 {
+    color: #102033;
+    font-size: 1.45rem;
+    font-weight: 900;
+    line-height: 1.3;
+    margin-top: 5px;
+}
+
+.admin-user-detail-header p {
+    color: #64748b;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    margin-top: 4px;
+}
+
+.admin-user-detail-header > a,
+.admin-user-detail-link {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #bfe8df;
+    border-radius: 7px;
+    color: #0f766e;
+    display: inline-flex;
+    font-size: 0.78rem;
+    font-weight: 900;
+    justify-content: center;
+    min-height: 40px;
+    padding: 8px 11px;
+    white-space: nowrap;
+}
+
+.admin-user-detail-header > a:hover,
+.admin-user-detail-link:hover {
+    background: #ecfdf5;
+    border-color: #5eead4;
+}
+
+.admin-user-detail-header > a:focus-visible,
+.admin-user-detail-link:focus-visible {
+    outline: 3px solid rgba(20, 184, 166, 0.24);
+    outline-offset: 2px;
+}
+
+.admin-user-detail-metrics {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 18px 22px;
+}
+
+.admin-user-detail-metrics div {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 16px;
+}
+
+.admin-user-detail-metrics span,
+.admin-user-detail-metrics small {
+    color: #64748b;
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.admin-user-detail-metrics strong {
+    color: #0f766e;
+    display: block;
+    font-size: 1.6rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 900;
+    line-height: 1.15;
+    margin: 4px 0;
+}
+
+.admin-user-course-table {
+    min-width: 880px;
+}
+
+.admin-user-course-category {
+    margin-bottom: 3px;
+}
+
+.admin-user-detail-empty {
+    border: 0;
+    border-radius: 0;
+    min-height: 140px;
+}
+
+.admin-user-list-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 1280px;
+    width: 100%;
+}
+
+.admin-user-list-table th {
+    background: #f8fafc;
+    color: #617086;
+    font-size: 0.72rem;
+    font-weight: 900;
+    padding: 13px 16px;
+    text-align: left;
+}
+
+.admin-user-list-table td {
+    border-top: 1px solid #edf2f7;
+    color: #526579;
+    font-size: 0.86rem;
+    padding: 15px 16px;
+    vertical-align: top;
+}
+
+.admin-user-name-form,
+.admin-user-password-form {
+    display: flex;
+    gap: 8px;
+    min-width: 260px;
+}
+
+.admin-user-name-form input,
+.admin-user-password-form input {
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    color: #102033;
+    font: inherit;
+    min-height: 40px;
+    min-width: 0;
+    padding: 8px 10px;
+}
+
+.admin-user-name-form input {
+    flex: 1;
+}
+
+.admin-user-password-form input {
+    width: 190px;
+}
+
+.admin-user-name-form button,
+.admin-user-password-form button {
+    border: 1px solid #bfe8df;
+    border-radius: 7px;
+    color: #0f766e;
+    font-size: 0.76rem;
+    font-weight: 900;
+    min-height: 40px;
+    padding: 8px 10px;
+    white-space: nowrap;
+}
+
+.admin-user-name-form button:hover,
+.admin-user-password-form button:hover {
+    background: #ecfdf5;
+}
+
+.admin-user-name-form input:focus,
+.admin-user-password-form input:focus {
+    border-color: #14b8a6;
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.14);
+    outline: 0;
+}
+
+.admin-user-account-line {
+    color: #64748b;
+    display: block;
+    font-size: 0.78rem;
+    margin-top: 8px;
+}
+
+.admin-user-group-name {
+    color: #334155;
+    display: block;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    max-width: 210px;
+}
+
+.admin-user-learning-summary {
+    display: grid;
+    gap: 5px;
+    grid-template-columns: repeat(3, max-content);
+    margin-bottom: 9px;
+}
+
+.admin-user-learning-summary span {
+    background: #f8fafc;
+    border-radius: 6px;
+    color: #64748b;
+    font-size: 0.7rem;
+    padding: 5px 7px;
+}
+
+.admin-user-learning-summary strong {
+    color: #0f766e;
+    font-variant-numeric: tabular-nums;
+    font-weight: 900;
+}
+
+.admin-user-delete-button {
+    color: #b42318;
+    font-size: 0.78rem;
+    font-weight: 900;
+    min-height: 40px;
+    padding: 6px;
+}
+
+.admin-user-delete-button:hover {
+    text-decoration: underline;
+}
+
+.admin-user-name-form button:focus-visible,
+.admin-user-password-form button:focus-visible,
+.admin-user-delete-button:focus-visible {
+    outline: 3px solid rgba(20, 184, 166, 0.24);
+    outline-offset: 2px;
+}
+
+.admin-user-empty-row {
+    color: #64748b !important;
+    padding: 40px 16px !important;
+    text-align: center;
+}
+
 @media (max-width: 1320px) {
     .admin-dashboard-hero {
         grid-template-columns: minmax(0, 1fr);
@@ -1409,6 +1681,16 @@ a:hover > .auth-site-logo {
 
     .attempt-filter-actions {
         flex-wrap: wrap;
+    }
+
+    .admin-user-detail-header {
+        flex-direction: column;
+        padding: 18px;
+    }
+
+    .admin-user-detail-metrics {
+        grid-template-columns: 1fr;
+        padding: 14px 18px;
     }
 
     .attempt-group-header {
