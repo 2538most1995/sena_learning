@@ -33,7 +33,8 @@ $courses = db()->query(
         (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) AS lesson_count,
         (SELECT COUNT(*) FROM curriculum_items ci WHERE ci.course_id = c.id) AS curriculum_count,
         (SELECT COUNT(*) FROM curriculum_items ci WHERE ci.course_id = c.id AND ci.item_type = 'quiz_set') AS quiz_set_count,
-        (SELECT COUNT(*) FROM attempts a WHERE a.course_id = c.id) AS learner_count
+        (SELECT COUNT(DISTINCT COALESCE(CONCAT('user:', a.user_id), CONCAT('guest:', TRIM(a.learner_name))))
+         FROM attempts a WHERE a.course_id = c.id) AS learner_count
      FROM courses c
      ORDER BY c.created_at DESC, c.id DESC"
 )->fetchAll();
@@ -111,7 +112,7 @@ render_header('หลังบ้าน', 'admin');
                 <strong><?= $publishedCourseCount ?></strong>
             </div>
             <div>
-                <span>รายการเข้าเรียน</span>
+                <span>ผู้เรียนในหลักสูตร</span>
                 <strong><?= $totalLearnerCount ?></strong>
             </div>
             <div>
@@ -220,7 +221,14 @@ render_header('หลังบ้าน', 'admin');
                             <td><span class="admin-metric-pill"><?= (int) $course['curriculum_count'] ?></span></td>
                             <td><span class="admin-metric-pill"><?= (int) $course['lesson_count'] ?></span></td>
                             <td><span class="admin-metric-pill"><?= (int) $course['quiz_set_count'] ?></span></td>
-                            <td><span class="admin-metric-pill is-learner"><?= (int) $course['learner_count'] ?></span></td>
+                            <td>
+                                <a
+                                    class="admin-metric-pill is-learner admin-learner-link"
+                                    href="attempts.php?course_id=<?= (int) $course['id'] ?>&amp;audience=all"
+                                    aria-label="ดูผู้เรียนหลักสูตร <?= e((string) $course['title']) ?> จำนวน <?= (int) $course['learner_count'] ?> คน"
+                                    title="ดูรายชื่อผู้เรียน"
+                                ><?= (int) $course['learner_count'] ?></a>
+                            </td>
                             <td>
                                 <span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-extrabold <?= course_is_public($course) ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-blue-200 bg-blue-50 text-blue-700' ?>">
                                     <?= e(course_access_label((string) ($course['access_mode'] ?? ''))) ?>
