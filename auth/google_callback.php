@@ -38,7 +38,17 @@ $tokenResponse = google_post('https://oauth2.googleapis.com/token', [
 ]);
 
 if (empty($tokenResponse['access_token'])) {
-    flash('ไม่สามารถแลกรับ token จาก Google ได้', 'error');
+    $tokenError = (string) ($tokenResponse['error'] ?? 'connection_failed');
+    $tokenErrorDescription = (string) ($tokenResponse['error_description'] ?? '');
+    error_log('Google token exchange failed: ' . $tokenError . ($tokenErrorDescription !== '' ? ' - ' . $tokenErrorDescription : ''));
+
+    $message = match ($tokenError) {
+        'invalid_client' => 'Google Client Secret ไม่ตรงกับ OAuth Client กรุณาตรวจการตั้งค่าฝั่งเซิร์ฟเวอร์',
+        'invalid_grant' => 'คำขอเข้าสู่ระบบ Google หมดอายุหรือถูกใช้แล้ว กรุณากดเข้าสู่ระบบด้วย Google ใหม่อีกครั้ง',
+        'redirect_uri_mismatch' => 'Callback URL ของ Google ไม่ตรงกัน กรุณาตรวจ Authorized redirect URI',
+        default => 'เซิร์ฟเวอร์ไม่สามารถเชื่อมต่อ Google เพื่อยืนยันการเข้าสู่ระบบได้ กรุณาลองใหม่',
+    };
+    flash($message, 'error');
     redirect('login.php');
 }
 
@@ -68,6 +78,29 @@ try {
 
 function google_post(string $url, array $data): array
 {
+    if (function_exists('curl_init')) {
+        $curl = curl_init($url);
+        if ($curl !== false) {
+            curl_setopt_array($curl, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => http_build_query($data),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT => 15,
+            ]);
+            $raw = curl_exec($curl);
+            $curlError = curl_error($curl);
+            curl_close($curl);
+            if (is_string($raw) && $raw !== '') {
+                return (array) (json_decode($raw, true) ?: []);
+            }
+            if ($curlError !== '') {
+                error_log('Google token endpoint connection failed: ' . $curlError);
+            }
+        }
+    }
+
     $context = stream_context_create([
         'http' => [
             'method'  => 'POST',

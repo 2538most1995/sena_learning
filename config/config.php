@@ -24,7 +24,7 @@ define('APP_URL', rtrim((string) (
     ?: getenv('REDIRECT_SENA_LEARNING_APP_URL')
     ?: ($_SERVER['SENA_LEARNING_APP_URL'] ?? '')
     ?: ($_SERVER['REDIRECT_SENA_LEARNING_APP_URL'] ?? '')
-    ?: 'http://localhost/sena_learning'
+    ?: 'http://localhost:8888'
 ), '/'));
 
 const DB_HOST = '127.0.0.1';
@@ -106,7 +106,14 @@ define('GOOGLE_CLIENT_SECRET', trim((string) (
     ?: ($oauthConfig['google_client_secret'] ?? '')
     ?: ''
 )));
-define('GOOGLE_REDIRECT_URI', APP_URL . '/auth/google_callback.php');
+define('GOOGLE_REDIRECT_URI', trim((string) (
+    getenv('SENA_LEARNING_GOOGLE_REDIRECT_URI')
+    ?: getenv('REDIRECT_SENA_LEARNING_GOOGLE_REDIRECT_URI')
+    ?: ($_SERVER['SENA_LEARNING_GOOGLE_REDIRECT_URI'] ?? '')
+    ?: ($_SERVER['REDIRECT_SENA_LEARNING_GOOGLE_REDIRECT_URI'] ?? '')
+    ?: ($oauthConfig['google_redirect_uri'] ?? '')
+    ?: APP_URL . '/auth/google_callback.php'
+)));
 define('LINE_CHANNEL_ID', trim((string) (
     getenv('SENA_LEARNING_LINE_CHANNEL_ID')
     ?: getenv('REDIRECT_SENA_LEARNING_LINE_CHANNEL_ID')
@@ -123,6 +130,13 @@ define('LINE_CHANNEL_SECRET', trim((string) (
     ?: ($oauthConfig['line_channel_secret'] ?? '')
     ?: ''
 )));
-define('LINE_REDIRECT_URI', APP_URL . '/auth/line_callback.php');
+define('LINE_REDIRECT_URI', trim((string) (
+    getenv('SENA_LEARNING_LINE_REDIRECT_URI')
+    ?: getenv('REDIRECT_SENA_LEARNING_LINE_REDIRECT_URI')
+    ?: ($_SERVER['SENA_LEARNING_LINE_REDIRECT_URI'] ?? '')
+    ?: ($_SERVER['REDIRECT_SENA_LEARNING_LINE_REDIRECT_URI'] ?? '')
+    ?: ($oauthConfig['line_redirect_uri'] ?? '')
+    ?: APP_URL . '/auth/line_callback.php'
+)));
 
 date_default_timezone_set('Asia/Bangkok');
