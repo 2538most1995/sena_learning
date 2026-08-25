@@ -15,6 +15,12 @@ unset($_SESSION['register_old']);
 
 // Handle POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        require_valid_csrf_token();
+    } catch (RuntimeException $e) {
+        flash($e->getMessage(), 'error');
+        redirect('register.php');
+    }
     $name     = trim((string) post('display_name'));
     $email    = trim((string) post('email'));
     $password = (string) post('password');
@@ -88,21 +94,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <?php if ($error): ?>
-        <div class="rounded-lg border <?= $error['type'] === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700' ?> px-4 py-3 text-sm font-semibold">
+        <div role="<?= $error['type'] === 'error' ? 'alert' : 'status' ?>" class="rounded-lg border <?= $error['type'] === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700' ?> px-4 py-3 text-sm font-semibold">
             <?= e($error['message']) ?>
         </div>
         <?php endif; ?>
 
         <form method="post" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5" for="reg-name">
                     ชื่อ-นามสกุล <span class="text-red-500">*</span>
                 </label>
                 <input id="reg-name" name="display_name" type="text" required
                        class="input-field"
+                       autocomplete="name" aria-describedby="reg-name-help"
                        placeholder="เช่น นางสาวอารีย์ รักการเรียน"
                        value="<?= e((string) ($old['display_name'] ?? '')) ?>">
-                <p class="mt-1 text-xs text-slate-400">ชื่อที่จะแสดงในเกียรติบัตร</p>
+                <p id="reg-name-help" class="mt-1 text-xs text-slate-500">ชื่อที่จะแสดงในเกียรติบัตร</p>
             </div>
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5" for="reg-email">
@@ -119,14 +127,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </label>
                 <input id="reg-password" name="password" type="password" required
                        class="input-field" placeholder="อย่างน้อย 6 ตัวอักษร"
-                       autocomplete="new-password" minlength="6"
+                       autocomplete="new-password" minlength="6" aria-describedby="strength-text"
                        oninput="checkStrength(this.value)">
                 <div class="mt-2 flex gap-1">
                     <div id="s1" class="strength-bar flex-1 bg-slate-200"></div>
                     <div id="s2" class="strength-bar flex-1 bg-slate-200"></div>
                     <div id="s3" class="strength-bar flex-1 bg-slate-200"></div>
                 </div>
-                <p id="strength-text" class="mt-1 text-xs text-slate-400"></p>
+                <p id="strength-text" class="mt-1 text-xs text-slate-500" aria-live="polite"></p>
             </div>
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5" for="reg-confirm">

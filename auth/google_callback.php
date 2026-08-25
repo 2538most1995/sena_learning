@@ -10,17 +10,15 @@ if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
     redirect('../auth/login.php');
 }
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+$returnedState = (string) ($_GET['state'] ?? '');
+$oauth = consume_oauth_login('google', $returnedState);
+if ($oauth === null) {
+    flash('คำขอไม่ถูกต้อง กรุณาลองใหม่', 'error');
+    redirect('login.php');
 }
 
-// Validate state
-$returnedState = (string) ($_GET['state'] ?? '');
-$savedState    = (string) ($_SESSION['oauth_state'] ?? '');
-unset($_SESSION['oauth_state']);
-
-if ($returnedState === '' || $returnedState !== $savedState) {
-    flash('คำขอไม่ถูกต้อง กรุณาลองใหม่', 'error');
+if (isset($_GET['error'])) {
+    flash('ยกเลิกการเข้าสู่ระบบด้วย Google แล้ว', 'error');
     redirect('login.php');
 }
 
@@ -46,7 +44,7 @@ if (empty($tokenResponse['access_token'])) {
 
 // Get user profile
 $profile = google_get(
-    'https://www.googleapis.com/oauth2/v3/userinfo',
+    'https://openidconnect.googleapis.com/v1/userinfo',
     (string) $tokenResponse['access_token']
 );
 
@@ -61,7 +59,8 @@ try {
     flash('เข้าสู่ระบบด้วย Google สำเร็จ ยินดีต้อนรับ ' . $user['display_name']);
     redirect('../index.php');
 } catch (Throwable $e) {
-    flash('เกิดข้อผิดพลาด: ' . $e->getMessage(), 'error');
+    error_log('Google login failed: ' . $e->getMessage());
+    flash('ไม่สามารถเข้าสู่ระบบด้วย Google ได้ กรุณาลองใหม่', 'error');
     redirect('login.php');
 }
 

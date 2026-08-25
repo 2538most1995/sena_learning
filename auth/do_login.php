@@ -11,6 +11,12 @@ if (current_user()) {
 
 // Handle POST: email/password login
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        require_valid_csrf_token();
+    } catch (RuntimeException $e) {
+        flash($e->getMessage(), 'error');
+        redirect('login.php?tab=general');
+    }
     $email    = trim((string) post('email'));
     $password = (string) post('password');
 

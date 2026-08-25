@@ -4,6 +4,7 @@
 
 ## ความสามารถหลัก
 
+- ประชาชนทั่วไปสมัครด้วยอีเมล หรือเข้าสู่ระบบด้วย Google และ LINE ได้
 - ผู้เรียนต้องเข้าสู่ระบบก่อนเริ่มเรียน นักศึกษา ศกร. ใช้เลขบัตรประชาชน 13 หลักเพียงอย่างเดียว
 - คลังชุดข้อสอบกลาง เลือกแทรกในลำดับการเรียนได้อิสระ
 - บทเรียนรองรับ HTML/ข้อความ, วิดีโอ URL, embed code และลิงก์สื่อ
@@ -33,6 +34,27 @@
 - password เริ่มต้น: `123456`
 - หลังเข้าสู่ระบบ ให้เพิ่มบัญชี admin หรือตั้งรหัสผ่านใหม่ที่เมนู `จัดการผู้ใช้`
 - ค่า `ADMIN_USERNAME` และ `ADMIN_PIN` ใน `config/config.php` ใช้สร้างบัญชี admin เริ่มต้นเฉพาะตอนที่ตารางยังไม่มีข้อมูล
+
+## ตั้งค่า Google และ LINE Login
+
+1. ตั้ง `SENA_LEARNING_APP_URL` เป็น URL จริงของระบบ โดย production ต้องใช้ HTTPS
+2. คัดลอก `config/oauth.example.php` เป็น `config/oauth.php` และใส่ Client ID/Secret จริง ไฟล์ `oauth.php` ถูก ignore และห้าม commit
+3. Google Cloud Console: เพิ่ม Authorized redirect URI เป็น
+   `https://your-domain.example/sena_learning/auth/google_callback.php`
+4. LINE Developers Console: สร้าง LINE Login channel, เพิ่ม Callback URL เป็น
+   `https://your-domain.example/sena_learning/auth/line_callback.php` และ Publish channel ก่อนเปิดให้ประชาชนใช้
+5. หากต้องการรับอีเมลจาก LINE ให้ยื่นขอ Email address permission ใน LINE Developers Console; หากไม่ได้รับสิทธิ์ ระบบยังสมัคร/เข้าสู่ระบบด้วย LINE user ID และชื่อโปรไฟล์ได้
+
+สามารถใช้ environment variables แทนไฟล์ได้:
+
+```text
+SENA_LEARNING_GOOGLE_CLIENT_ID=...
+SENA_LEARNING_GOOGLE_CLIENT_SECRET=...
+SENA_LEARNING_LINE_CHANNEL_ID=...
+SENA_LEARNING_LINE_CHANNEL_SECRET=...
+```
+
+ปุ่มผู้ให้บริการจะแสดงเฉพาะรายที่กำหนดทั้ง ID และ Secret ครบแล้ว บัญชีที่กลับมาจาก Google/LINE จะเชื่อมกับบัญชีเดิมเฉพาะเมื่อมีอีเมลที่ผู้ให้บริการยืนยันและตรงกัน
 
 ## รูปแบบ JSON สำหรับนำเข้าข้อสอบ
 

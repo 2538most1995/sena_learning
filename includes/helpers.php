@@ -2192,6 +2192,72 @@ function login_user(array $user): void
         ->execute([(int) $user['id']]);
 }
 
+function csrf_token(): string
+{
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = generate_token(32);
+    }
+
+    return $_SESSION['csrf_token'];
+}
+
+function require_valid_csrf_token(): void
+{
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    $submitted = (string) post('csrf_token');
+    $expected = (string) ($_SESSION['csrf_token'] ?? '');
+    if ($submitted === '' || $expected === '' || !hash_equals($expected, $submitted)) {
+        throw new RuntimeException('แบบฟอร์มหมดอายุ กรุณาลองอีกครั้ง');
+    }
+}
+
+function begin_oauth_login(string $provider): array
+{
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    if (!in_array($provider, ['google', 'line'], true)) {
+        throw new InvalidArgumentException('Unsupported OAuth provider');
+    }
+
+    $transaction = [
+        'state' => generate_token(32),
+        'nonce' => generate_token(32),
+        'created_at' => time(),
+    ];
+    $_SESSION['oauth_login'][$provider] = $transaction;
+
+    return $transaction;
+}
+
+function consume_oauth_login(string $provider, string $returnedState, int $maxAgeSeconds = 600): ?array
+{
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    $transaction = $_SESSION['oauth_login'][$provider] ?? null;
+    unset($_SESSION['oauth_login'][$provider]);
+
+    if (!is_array($transaction) || $returnedState === '') {
+        return null;
+    }
+    $savedState = (string) ($transaction['state'] ?? '');
+    $createdAt = (int) ($transaction['created_at'] ?? 0);
+    if ($savedState === '' || !hash_equals($savedState, $returnedState)) {
+        return null;
+    }
+    if ($createdAt <= 0 || time() - $createdAt > $maxAgeSeconds) {
+        return null;
+    }
+
+    return $transaction;
+}
+
 function logout_user(): void
 {
     if (session_status() === PHP_SESSION_NONE) {
@@ -2334,7 +2400,10 @@ function upsert_google_user(array $profile): array
 {
     ensure_users_table();
     $googleId = (string) ($profile['id'] ?? $profile['sub'] ?? '');
-    $email    = mb_strtolower(trim((string) ($profile['email'] ?? '')), 'UTF-8');
+    $emailVerified = filter_var($profile['email_verified'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    $email = $emailVerified
+        ? mb_strtolower(trim((string) ($profile['email'] ?? '')), 'UTF-8')
+        : '';
     $name     = normalize_user_display_name((string) ($profile['name'] ?? $email));
     $avatar   = (string) ($profile['picture'] ?? '');
 

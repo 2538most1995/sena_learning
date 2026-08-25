@@ -9,6 +9,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirect('login.php?tab=student');
 }
 
+try {
+    require_valid_csrf_token();
+} catch (RuntimeException $e) {
+    flash($e->getMessage(), 'error');
+    redirect('login.php?tab=student');
+}
+
 $citizenId = normalize_skr_citizen_id((string) post('citizen_id'));
 
 if (!preg_match('/^\d{13}$/', $citizenId)) {

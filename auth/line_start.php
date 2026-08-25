@@ -8,22 +8,15 @@ if (!LINE_CHANNEL_ID || !LINE_CHANNEL_SECRET) {
     redirect('login.php');
 }
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-$state = generate_token(16);
-$nonce = generate_token(16);
-$_SESSION['line_oauth_state'] = $state;
-$_SESSION['line_oauth_nonce'] = $nonce;
+$oauth = begin_oauth_login('line');
 
 $params = http_build_query([
     'response_type' => 'code',
     'client_id' => LINE_CHANNEL_ID,
     'redirect_uri' => LINE_REDIRECT_URI,
-    'state' => $state,
+    'state' => $oauth['state'],
     'scope' => 'profile openid email',
-    'nonce' => $nonce,
+    'nonce' => $oauth['nonce'],
     'bot_prompt' => 'normal',
 ]);
 

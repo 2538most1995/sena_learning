@@ -8,18 +8,14 @@ if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
     redirect('login.php');
 }
 
-$state = generate_token(16);
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-$_SESSION['oauth_state'] = $state;
+$oauth = begin_oauth_login('google');
 
 $params = http_build_query([
     'client_id'     => GOOGLE_CLIENT_ID,
     'redirect_uri'  => GOOGLE_REDIRECT_URI,
     'response_type' => 'code',
     'scope'         => 'openid email profile',
-    'state'         => $state,
+    'state'         => $oauth['state'],
     'access_type'   => 'online',
     'prompt'        => 'select_account',
 ]);

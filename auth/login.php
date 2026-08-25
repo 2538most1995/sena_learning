@@ -62,23 +62,25 @@ $socialLoginEnabled = $googleEnabled || $lineEnabled;
             <h1 class="text-xl font-extrabold text-ink mb-1">เข้าสู่ระบบ</h1>
             <p class="text-sm text-slate-500 mb-5">เลือกประเภทผู้ใช้งาน</p>
 
-            <div class="flex gap-2 p-1 bg-slate-100 rounded-lg">
+            <nav class="flex gap-2 p-1 bg-slate-100 rounded-lg" aria-label="ประเภทผู้ใช้งาน">
                 <a href="?tab=general"
                    id="tab-general"
+                   <?= $tab === 'general' ? 'aria-current="page"' : '' ?>
                    class="tab-btn flex-1 text-center text-sm font-semibold py-2 rounded-md <?= $tab === 'general' ? 'active' : '' ?>">
                     ประชาชนทั่วไป
                 </a>
                 <a href="?tab=student"
                    id="tab-student"
+                   <?= $tab === 'student' ? 'aria-current="page"' : '' ?>
                    class="tab-btn flex-1 text-center text-sm font-semibold py-2 rounded-md <?= $tab === 'student' ? 'active' : '' ?>">
                     นักศึกษา ศกร.
                 </a>
-            </div>
+            </nav>
         </div>
 
         <!-- Flash message -->
         <?php if ($error): ?>
-        <div class="mx-6 mt-4 rounded-lg border <?= $error['type'] === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700' ?> px-4 py-3 text-sm font-semibold">
+        <div role="<?= $error['type'] === 'error' ? 'alert' : 'status' ?>" class="mx-6 mt-4 rounded-lg border <?= $error['type'] === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700' ?> px-4 py-3 text-sm font-semibold">
             <?= e($error['message']) ?>
         </div>
         <?php endif; ?>
@@ -92,13 +94,13 @@ $socialLoginEnabled = $googleEnabled || $lineEnabled;
                 <?php if ($googleEnabled): ?>
                 <a href="google_start.php" class="btn-social btn-google" aria-label="เข้าสู่ระบบด้วย Google">
                     <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-                    <span>Google</span>
+                    <span>เข้าสู่ระบบด้วย Google</span>
                 </a>
                 <?php endif; ?>
                 <?php if ($lineEnabled): ?>
                 <a href="line_start.php" class="btn-social btn-line" aria-label="เข้าสู่ระบบด้วย LINE">
                     <span class="line-bubble" aria-hidden="true">LINE</span>
-                    <span>LINE</span>
+                    <span>เข้าสู่ระบบด้วย LINE</span>
                 </a>
                 <?php endif; ?>
             </div>
@@ -106,6 +108,7 @@ $socialLoginEnabled = $googleEnabled || $lineEnabled;
             <?php endif; ?>
 
             <form method="post" action="do_login.php" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5" for="email">อีเมล</label>
                     <input id="email" name="email" type="email" required
@@ -142,15 +145,16 @@ $socialLoginEnabled = $googleEnabled || $lineEnabled;
             </div>
 
             <form method="post" action="skr_login.php" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5" for="citizen_id">เลขบัตรประชาชน 13 หลัก</label>
                     <input id="citizen_id" name="citizen_id" type="text" required
                            class="input-field" placeholder="เช่น 1234567890123"
                            autocomplete="username" inputmode="numeric"
                            maxlength="13" minlength="13"
-                           pattern="[0-9]{13}"
+                           pattern="[0-9]{13}" aria-describedby="citizen-id-help"
                            oninput="this.value=this.value.replace(/\D/g,'').slice(0,13)">
-                    <p class="mt-1 text-xs text-slate-400">กรอกตัวเลข 13 หลัก โดยไม่ต้องใส่ขีด</p>
+                    <p id="citizen-id-help" class="mt-1 text-xs text-slate-500">กรอกตัวเลข 13 หลัก โดยไม่ต้องใส่ขีด</p>
                 </div>
                 <button type="submit" class="btn-primary">เข้าสู่ระบบ</button>
             </form>

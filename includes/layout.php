@@ -70,7 +70,7 @@ function render_header(string $title, string $active = ''): void
                     <!-- User dropdown -->
                     <div class="relative" id="user-menu-wrapper">
                         <button id="user-menu-btn"
-                                onclick="var d=document.getElementById('user-dropdown');d.classList.toggle('hidden')"
+                                type="button" aria-expanded="false" aria-controls="user-dropdown"
                                 class="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 transition-colors">
                             <?php if (!empty($currentUser['avatar_url'])): ?>
                                 <img src="<?= e((string) $currentUser['avatar_url']) ?>" alt="" class="h-6 w-6 rounded-full object-cover">
@@ -113,10 +113,12 @@ function render_header(string $title, string $active = ''): void
                                 โปรไฟล์ / เปลี่ยนรหัสผ่าน
                             </a>
                             <?php endif; ?>
-                            <a href="<?= e($base) ?>/auth/logout.php"
-                               class="block px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50">
-                                ออกจากระบบ
-                            </a>
+                            <form method="post" action="<?= e($base) ?>/auth/logout.php">
+                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                <button type="submit" class="block w-full px-4 py-3 text-left text-sm font-semibold text-red-600 hover:bg-red-50">
+                                    ออกจากระบบ
+                                </button>
+                            </form>
                         </div>
                     </div>
                     <?php elseif ($adminUser): ?>
@@ -170,12 +172,28 @@ function render_footer(): void
             </div>
         </footer>
         <script>
-        // ปิด dropdown เมื่อคลิกข้างนอก
+        var userMenuButton = document.getElementById('user-menu-btn');
+        var userDropdown = document.getElementById('user-dropdown');
+        function closeUserMenu(restoreFocus) {
+            if (!userMenuButton || !userDropdown) return;
+            userDropdown.classList.add('hidden');
+            userMenuButton.setAttribute('aria-expanded', 'false');
+            if (restoreFocus) userMenuButton.focus();
+        }
+        if (userMenuButton && userDropdown) {
+            userMenuButton.addEventListener('click', function() {
+                var willOpen = userDropdown.classList.contains('hidden');
+                userDropdown.classList.toggle('hidden');
+                userMenuButton.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            });
+            userDropdown.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') closeUserMenu(true);
+            });
+        }
         document.addEventListener('click', function(e) {
             var wrapper = document.getElementById('user-menu-wrapper');
             if (wrapper && !wrapper.contains(e.target)) {
-                var d = document.getElementById('user-dropdown');
-                if (d) d.classList.add('hidden');
+                closeUserMenu(false);
             }
         });
         </script>

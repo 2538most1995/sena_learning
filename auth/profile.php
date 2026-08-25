@@ -18,6 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $newPassword = (string) post('new_password');
     $confirmPassword = (string) post('confirm_password');
     try {
+        require_valid_csrf_token();
         if ($newPassword !== $confirmPassword) {
             throw new RuntimeException('รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน');
         }
@@ -49,6 +50,7 @@ render_header('โปรไฟล์ผู้ใช้', 'learn');
         </dl>
 
         <form method="post" class="mt-8 space-y-4">
+            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <div>
                 <h2 class="text-xl font-extrabold">เปลี่ยนรหัสผ่าน</h2>
                 <p class="mt-1 text-sm text-slate-500">

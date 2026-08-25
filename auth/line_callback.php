@@ -10,17 +10,16 @@ if (!LINE_CHANNEL_ID || !LINE_CHANNEL_SECRET) {
     redirect('login.php');
 }
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 $returnedState = (string) ($_GET['state'] ?? '');
-$savedState = (string) ($_SESSION['line_oauth_state'] ?? '');
-$savedNonce = (string) ($_SESSION['line_oauth_nonce'] ?? '');
-unset($_SESSION['line_oauth_state'], $_SESSION['line_oauth_nonce']);
-
-if ($returnedState === '' || $savedState === '' || !hash_equals($savedState, $returnedState)) {
+$oauth = consume_oauth_login('line', $returnedState);
+if ($oauth === null) {
     flash('คำขอ LINE ไม่ถูกต้อง กรุณาลองใหม่', 'error');
+    redirect('login.php');
+}
+$savedNonce = (string) ($oauth['nonce'] ?? '');
+
+if (isset($_GET['error'])) {
+    flash('ยกเลิกการเข้าสู่ระบบด้วย LINE แล้ว', 'error');
     redirect('login.php');
 }
 
@@ -46,7 +45,11 @@ if (empty($tokenResponse['access_token'])) {
 $profile = line_get('https://api.line.me/v2/profile', (string) $tokenResponse['access_token']);
 $idTokenProfile = [];
 if (!empty($tokenResponse['id_token'])) {
-    $idTokenProfile = line_verify_id_token((string) $tokenResponse['id_token'], $savedNonce);
+    $idTokenProfile = line_verify_id_token(
+        (string) $tokenResponse['id_token'],
+        $savedNonce,
+        (string) ($profile['userId'] ?? '')
+    );
 }
 
 $lineProfile = array_filter([
@@ -67,7 +70,8 @@ try {
     flash('เข้าสู่ระบบด้วย LINE สำเร็จ ยินดีต้อนรับ ' . $user['display_name']);
     redirect('../index.php');
 } catch (Throwable $e) {
-    flash('เกิดข้อผิดพลาด: ' . $e->getMessage(), 'error');
+    error_log('LINE login failed: ' . $e->getMessage());
+    flash('ไม่สามารถเข้าสู่ระบบด้วย LINE ได้ กรุณาลองใหม่', 'error');
     redirect('login.php');
 }
 
@@ -100,56 +104,27 @@ function line_get(string $url, string $accessToken): array
     return $raw ? (array) (json_decode($raw, true) ?: []) : [];
 }
 
-function line_verify_id_token(string $idToken, string $expectedNonce): array
+function line_verify_id_token(string $idToken, string $expectedNonce, string $expectedUserId): array
 {
-    $payload = line_post('https://api.line.me/oauth2/v2.1/verify', [
+    $verification = [
         'id_token' => $idToken,
         'client_id' => LINE_CHANNEL_ID,
-    ]);
+        'nonce' => $expectedNonce,
+    ];
+    if ($expectedUserId !== '') {
+        $verification['user_id'] = $expectedUserId;
+    }
+    $payload = line_post('https://api.line.me/oauth2/v2.1/verify', $verification);
     if (!$payload) {
-        return line_decode_id_token($idToken, $expectedNonce);
+        return [];
     }
-    if ($expectedNonce !== '' && !hash_equals($expectedNonce, (string) ($payload['nonce'] ?? ''))) {
+    $subject = (string) ($payload['sub'] ?? '');
+    if ($subject === '' || ($expectedNonce !== '' && !hash_equals($expectedNonce, (string) ($payload['nonce'] ?? '')))) {
+        return [];
+    }
+    if ($expectedUserId !== '' && !hash_equals($expectedUserId, $subject)) {
         return [];
     }
 
     return $payload;
-}
-
-function line_decode_id_token(string $idToken, string $expectedNonce): array
-{
-    $parts = explode('.', $idToken);
-    if (count($parts) !== 3) {
-        return [];
-    }
-
-    $payload = json_decode(base64_url_decode($parts[1]), true);
-    if (!is_array($payload)) {
-        return [];
-    }
-
-    if (($payload['iss'] ?? '') !== 'https://access.line.me') {
-        return [];
-    }
-    if ((string) ($payload['aud'] ?? '') !== LINE_CHANNEL_ID) {
-        return [];
-    }
-    if (!empty($payload['exp']) && (int) $payload['exp'] < time()) {
-        return [];
-    }
-    if ($expectedNonce !== '' && !hash_equals($expectedNonce, (string) ($payload['nonce'] ?? ''))) {
-        return [];
-    }
-
-    return $payload;
-}
-
-function base64_url_decode(string $value): string
-{
-    $padding = strlen($value) % 4;
-    if ($padding > 0) {
-        $value .= str_repeat('=', 4 - $padding);
-    }
-
-    return (string) base64_decode(strtr($value, '-_', '+/'), true);
 }
