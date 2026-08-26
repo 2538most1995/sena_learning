@@ -86,6 +86,7 @@ if ($attempt && (string) $attempt['status'] === 'started') {
 }
 
 $theme = normalize_public_quiz_theme((string) $share['theme']);
+$certificateMode = normalize_public_quiz_certificate_mode((string) ($share['certificate_mode'] ?? ((int) $share['certificate_enabled'] === 1 ? 'course' : 'none')));
 $pageTitle = (string) $share['public_title'];
 render_header($pageTitle, 'learn');
 ?>
@@ -118,7 +119,7 @@ render_header($pageTitle, 'learn');
                         <input type="hidden" name="action" value="start">
                         <input type="hidden" name="share" value="<?= e($shareToken) ?>">
                         <h2 class="text-2xl font-extrabold text-slate-900">พร้อมแล้ว เริ่มทำแบบทดสอบ</h2>
-                        <p id="shared-name-help" class="mt-2 text-sm leading-6 text-slate-600"><?= (int) $share['certificate_enabled'] === 1 ? 'ชื่อนี้จะใช้แสดงบนเกียรติบัตรเมื่อคุณผ่าน กรุณาตรวจสอบให้ถูกต้อง' : 'กรอกชื่อเพื่อบันทึกผลคะแนนของคุณ' ?></p>
+                        <p id="shared-name-help" class="mt-2 text-sm leading-6 text-slate-600"><?= $certificateMode !== 'none' ? 'ชื่อนี้จะใช้แสดงบนเกียรติบัตรเมื่อคุณผ่าน กรุณาตรวจสอบให้ถูกต้อง' : 'กรอกชื่อเพื่อบันทึกผลคะแนนของคุณ' ?></p>
                         <label for="learner_name" class="mt-6 block text-sm font-extrabold text-slate-800">ชื่อ–นามสกุล</label>
                         <input id="learner_name" name="learner_name" value="<?= e($learnerName) ?>" autocomplete="name" maxlength="255" required aria-describedby="shared-name-help<?= $error !== '' ? ' shared-quiz-error' : '' ?>" <?= $error !== '' ? 'aria-invalid="true"' : '' ?> placeholder="เช่น สมชาย ใจดี" class="shared-quiz-input mt-2 w-full rounded-xl border px-4 py-3 text-base focus:outline-none focus:ring-4">
                         <button type="submit" class="shared-quiz-primary mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-xl px-6 py-3 text-sm font-extrabold text-white focus:outline-none focus:ring-4 sm:w-auto">เริ่มทำแบบทดสอบ</button>
@@ -127,7 +128,7 @@ render_header($pageTitle, 'learn');
                         <dl class="grid gap-4 text-sm">
                             <div><dt class="font-semibold text-slate-500">จำนวนคำถาม</dt><dd class="mt-1 text-xl font-extrabold tabular-nums text-slate-900"><?= (int) $share['question_count'] ?> ข้อ</dd></div>
                             <div><dt class="font-semibold text-slate-500">เกณฑ์ผ่าน</dt><dd class="mt-1 text-xl font-extrabold tabular-nums text-slate-900"><?= e((string) (float) $share['pass_percent']) ?>%</dd></div>
-                            <div><dt class="font-semibold text-slate-500">เกียรติบัตร</dt><dd class="mt-1 font-extrabold text-slate-900"><?= (int) $share['certificate_enabled'] === 1 ? 'มี เมื่อผ่านเกณฑ์' : 'ไม่มี' ?></dd></div>
+                            <div><dt class="font-semibold text-slate-500">เกียรติบัตร</dt><dd class="mt-1 font-extrabold text-slate-900"><?= $certificateMode !== 'none' ? 'มี เมื่อผ่านเกณฑ์' : 'ไม่มี' ?></dd></div>
                         </dl>
                     </aside>
                 </div>
@@ -203,7 +204,7 @@ render_header($pageTitle, 'learn');
                         <?php endif; ?>
                         <a href="shared_quiz.php?share=<?= rawurlencode($shareToken) ?>" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-6 py-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-200"><?= $passed ? 'ทำแบบทดสอบอีกครั้ง' : 'ลองทำใหม่' ?></a>
                     </div>
-                    <?php if ($passed && (int) $share['certificate_enabled'] !== 1): ?>
+                    <?php if ($passed && $certificateMode === 'none'): ?>
                         <p class="mt-5 text-sm text-slate-500">แบบทดสอบชุดนี้ไม่ได้เปิดการออกเกียรติบัตร</p>
                     <?php endif; ?>
                 </div>

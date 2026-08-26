@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS public_quiz_shares (
     welcome_message TEXT NULL,
     pass_percent DECIMAL(5,2) NOT NULL DEFAULT 80,
     certificate_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    certificate_mode VARCHAR(20) NOT NULL DEFAULT 'course',
     theme VARCHAR(30) NOT NULL DEFAULT 'ocean',
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -148,6 +149,7 @@ CREATE TABLE IF NOT EXISTS public_quiz_attempts (
     percent DECIMAL(5,2) NULL,
     status ENUM('started','submitted','passed') NOT NULL DEFAULT 'started',
     certificate_code VARCHAR(80) NULL UNIQUE,
+    certificate_template_mode VARCHAR(20) NULL,
     started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     submitted_at TIMESTAMP NULL,
     KEY public_quiz_attempts_share_lookup (share_id, started_at),
@@ -165,6 +167,23 @@ CREATE TABLE IF NOT EXISTS public_quiz_answers (
     KEY public_quiz_answer_question_lookup (question_id),
     CONSTRAINT public_quiz_answers_attempt_fk FOREIGN KEY (attempt_id) REFERENCES public_quiz_attempts(id) ON DELETE CASCADE,
     CONSTRAINT public_quiz_answers_question_fk FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS public_quiz_certificate_settings (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    share_id INT UNSIGNED NOT NULL UNIQUE,
+    background_image VARCHAR(500) NULL,
+    logo_image VARCHAR(500) NULL,
+    signature_image VARCHAR(500) NULL,
+    issuer_name VARCHAR(255) NOT NULL DEFAULT 'SENA Learning Center',
+    signature_name VARCHAR(255) NOT NULL DEFAULT 'ผู้รับรองผลการทดสอบ',
+    title_text VARCHAR(255) NOT NULL DEFAULT 'เกียรติบัตรการผ่านแบบทดสอบ',
+    body_text TEXT NULL,
+    positions JSON NULL,
+    schema_version SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT public_quiz_certificate_settings_share_fk FOREIGN KEY (share_id) REFERENCES public_quiz_shares(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS curriculum_sections (

@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'public_title' => post('public_title'),
                 'welcome_message' => post('welcome_message'),
                 'pass_percent' => post('pass_percent'),
-                'certificate_enabled' => isset($_POST['certificate_enabled']),
+                'certificate_mode' => post('certificate_mode', 'course'),
                 'theme' => post('theme'),
                 'is_active' => isset($_POST['is_active']),
             ]);
@@ -137,6 +137,7 @@ foreach ($sets as $set) {
 $questions = $selectedSet ? quiz_set_questions((int) $selectedSet['id']) : [];
 $selectedShare = $selectedSet ? public_quiz_share_for_set((int) $selectedSet['id']) : null;
 $shareUrl = $selectedShare ? public_quiz_share_url($selectedShare) : '';
+$currentCertificateMode = normalize_public_quiz_certificate_mode((string) ($selectedShare['certificate_mode'] ?? 'course'));
 $quizThemes = public_quiz_themes();
 $questionLabels = ['single_choice' => 'ปรนัย 1 คำตอบ', 'multiple_choice' => 'เลือกได้หลายคำตอบ', 'true_false' => 'ถูก / ผิด', 'short_answer' => 'คำตอบสั้น'];
 $exampleJson = json_encode([[
@@ -261,11 +262,30 @@ render_header('คลังชุดข้อสอบกลาง', 'admin');
                                 <?php endforeach; ?>
                             </div>
                         </fieldset>
-                        <div class="grid gap-3 sm:grid-cols-2 lg:col-span-2">
-                            <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                <input type="checkbox" name="certificate_enabled" value="1" class="mt-1 h-4 w-4" <?= !$selectedShare || (int) $selectedShare['certificate_enabled'] === 1 ? 'checked' : '' ?>>
-                                <span><strong class="block text-sm text-slate-800">สร้างเกียรติบัตรเมื่อผ่าน</strong><small class="mt-1 block leading-5 text-slate-500">ใช้แม่แบบเกียรติบัตรของหลักสูตร <?= e((string) $selectedSet['course_title']) ?></small></span>
-                            </label>
+                        <fieldset class="lg:col-span-2" aria-describedby="certificate-mode-help">
+                            <legend class="text-sm font-extrabold text-slate-800">การออกเกียรติบัตรเมื่อผ่านเกณฑ์</legend>
+                            <p id="certificate-mode-help" class="mt-1 text-xs leading-5 text-slate-500">เลือกแหล่งแม่แบบให้ตรงกับประเภทของกิจกรรม เกียรติบัตรที่ออกแล้วจะจดจำแม่แบบที่ใช้ในขณะออก</p>
+                            <div class="mt-3 grid gap-3 md:grid-cols-3">
+                                <label class="certificate-mode-option flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 has-[:checked]:border-sea has-[:checked]:bg-teal-50 has-[:checked]:ring-2 has-[:checked]:ring-teal-100">
+                                    <input type="radio" name="certificate_mode" value="none" class="mt-1 h-4 w-4" <?= $currentCertificateMode === 'none' ? 'checked' : '' ?>>
+                                    <span><strong class="block text-sm text-slate-800">ไม่ออกเกียรติบัตร</strong><small class="mt-1 block leading-5 text-slate-500">แสดงเฉพาะคะแนนและผลผ่านเกณฑ์</small></span>
+                                </label>
+                                <label class="certificate-mode-option flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 has-[:checked]:border-sea has-[:checked]:bg-teal-50 has-[:checked]:ring-2 has-[:checked]:ring-teal-100">
+                                    <input type="radio" name="certificate_mode" value="course" class="mt-1 h-4 w-4" <?= $currentCertificateMode === 'course' ? 'checked' : '' ?>>
+                                    <span><strong class="block text-sm text-slate-800">ใช้แม่แบบหลักสูตร</strong><small class="mt-1 block leading-5 text-slate-500"><?= e((string) $selectedSet['course_title']) ?></small></span>
+                                </label>
+                                <label class="certificate-mode-option flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 has-[:checked]:border-sea has-[:checked]:bg-teal-50 has-[:checked]:ring-2 has-[:checked]:ring-teal-100">
+                                    <input type="radio" name="certificate_mode" value="custom" class="mt-1 h-4 w-4" <?= $currentCertificateMode === 'custom' ? 'checked' : '' ?>>
+                                    <span><strong class="block text-sm text-slate-800">แม่แบบเฉพาะแบบทดสอบ</strong><small class="mt-1 block leading-5 text-slate-500">แยกหัวข้อ ข้อความ โลโก้ ลายเซ็น และตำแหน่งทั้งหมด</small></span>
+                                </label>
+                            </div>
+                            <?php if ($selectedShare): ?>
+                                <a href="certificate_settings.php?share_id=<?= (int) $selectedShare['id'] ?>" class="mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-amber-300 bg-amber-50 px-5 py-2.5 text-sm font-extrabold text-amber-900 hover:bg-amber-100 focus:outline-none focus:ring-4 focus:ring-amber-100">ออกแบบเกียรติบัตรเฉพาะแบบทดสอบ ↗</a>
+                            <?php else: ?>
+                                <p class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">บันทึกเพื่อสร้างลิงก์แชร์ก่อน แล้วระบบจะแสดงปุ่มออกแบบแม่แบบเฉพาะ</p>
+                            <?php endif; ?>
+                        </fieldset>
+                        <div class="lg:col-span-2">
                             <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                                 <input type="checkbox" name="is_active" value="1" class="mt-1 h-4 w-4" <?= !$selectedShare || (int) $selectedShare['is_active'] === 1 ? 'checked' : '' ?>>
                                 <span><strong class="block text-sm text-slate-800">เปิดรับคำตอบ</strong><small class="mt-1 block leading-5 text-slate-500">ปิดได้ชั่วคราวโดยลิงก์เดิมไม่เปลี่ยน</small></span>

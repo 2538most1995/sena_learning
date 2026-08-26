@@ -6,42 +6,80 @@ require_once __DIR__ . '/../includes/certificate_renderer.php';
 require_admin();
 
 $courses = db()->query('SELECT id, title FROM courses ORDER BY title')->fetchAll();
-$courseId = get_int('course_id', (int) ($courses[0]['id'] ?? 0));
+$shareId = get_int('share_id');
+$isPublicQuizDesigner = $shareId > 0;
+$quizShare = null;
+if ($isPublicQuizDesigner) {
+    ensure_public_quiz_sharing_tables();
+    $quizShare = public_quiz_share_by_id($shareId);
+    if (!$quizShare) {
+        flash('ไม่พบแบบทดสอบสาธารณะที่ต้องการออกแบบเกียรติบัตร', 'error');
+        redirect('index.php');
+    }
+}
+$courseId = $isPublicQuizDesigner
+    ? (int) $quizShare['course_id']
+    : get_int('course_id', (int) ($courses[0]['id'] ?? 0));
 
 $stmt = db()->prepare('SELECT * FROM courses WHERE id = ?');
 $stmt->execute([$courseId]);
 $course = $stmt->fetch();
-if (!$course && $courses) {
+if (!$course && $courses && !$isPublicQuizDesigner) {
     redirect('certificate_settings.php?course_id=' . (int) $courses[0]['id']);
 }
 
+$designerQuery = $isPublicQuizDesigner ? 'share_id=' . $shareId : 'course_id=' . $courseId;
+$certificateSubjectTitle = $isPublicQuizDesigner
+    ? (string) $quizShare['public_title']
+    : (string) ($course['title'] ?? 'เกียรติบัตร');
+$backUrl = $isPublicQuizDesigner
+    ? 'questions.php?course_id=' . (int) $quizShare['course_id'] . '&set_id=' . (int) $quizShare['quiz_set_id']
+    : 'index.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $course) {
     try {
+        require_valid_csrf_token();
         if ((string) ($_POST['certificate_action'] ?? '') === 'copy_layout') {
-            copy_certificate_layout_positions((int) ($_POST['layout_source_course_id'] ?? 0), (int) $course['id']);
-            flash('นำตำแหน่งจากหลักสูตรต้นแบบมาใช้เรียบร้อยแล้ว สามารถปรับเพิ่มเติมได้ทันที');
+            if ($isPublicQuizDesigner) {
+                copy_course_certificate_to_public_quiz((int) ($_POST['layout_source_course_id'] ?? 0), $shareId);
+                flash('คัดลอกรูปแบบ ภาพ และตำแหน่งจากหลักสูตรแล้ว โดยคงข้อความรับรองของแบบทดสอบนี้ไว้');
+            } else {
+                copy_certificate_layout_positions((int) ($_POST['layout_source_course_id'] ?? 0), (int) $course['id']);
+                flash('นำตำแหน่งจากหลักสูตรต้นแบบมาใช้เรียบร้อยแล้ว สามารถปรับเพิ่มเติมได้ทันที');
+            }
         } else {
-            save_certificate_settings((int) $course['id'], $_POST);
-            flash('บันทึกการตั้งค่าเกียรติบัตรเรียบร้อยแล้ว');
+            if ($isPublicQuizDesigner) {
+                save_public_quiz_certificate_settings($shareId, $_POST);
+                flash('บันทึกแม่แบบเกียรติบัตรเฉพาะแบบทดสอบเรียบร้อยแล้ว');
+            } else {
+                save_certificate_settings((int) $course['id'], $_POST);
+                flash('บันทึกการตั้งค่าเกียรติบัตรเรียบร้อยแล้ว');
+            }
         }
-        redirect('certificate_settings.php?course_id=' . (int) $course['id']);
+        redirect('certificate_settings.php?' . $designerQuery);
     } catch (Throwable $exception) {
         flash($exception->getMessage(), 'error');
-        redirect('certificate_settings.php?course_id=' . (int) $course['id']);
+        redirect('certificate_settings.php?' . $designerQuery);
     }
 }
 
-$settings = $course ? get_certificate_settings((int) $course['id']) : [];
+$settings = $course
+    ? ($isPublicQuizDesigner ? get_public_quiz_certificate_settings($shareId) : get_certificate_settings((int) $course['id']))
+    : [];
 $layoutCourses = [];
 if ($course) {
-    $stmt = db()->prepare(
+    $sql =
         'SELECT c.id, c.title
          FROM courses c
          INNER JOIN certificate_settings cs ON cs.course_id = c.id
-         WHERE c.id <> ? AND cs.positions IS NOT NULL
-         ORDER BY c.title'
-    );
-    $stmt->execute([(int) $course['id']]);
+         WHERE cs.positions IS NOT NULL';
+    $params = [];
+    if (!$isPublicQuizDesigner) {
+        $sql .= ' AND c.id <> ?';
+        $params[] = (int) $course['id'];
+    }
+    $stmt = db()->prepare($sql . ' ORDER BY c.title');
+    $stmt->execute($params);
     $layoutCourses = $stmt->fetchAll();
 }
 
@@ -66,11 +104,11 @@ if (!isset($positions['background'])) {
 }
 $sampleAttempt = [
     'learner_name' => 'นายสมชาย เรียนรู้ดี',
-    'course_title' => $course['title'] ?? 'ตัวอย่างหลักสูตรคอมพิวเตอร์เบื้องต้น',
-    'certificate_code' => 'SENA-' . date('Ymd') . '-DEMO',
+    'course_title' => $certificateSubjectTitle,
+    'certificate_code' => ($isPublicQuizDesigner ? 'SENA-Q-' : 'SENA-') . date('Ymd') . '-DEMO',
 ];
 
-render_header('ระบบออกแบบเกียรติบัตรอัจฉริยะ', 'admin');
+render_header(($isPublicQuizDesigner ? 'ออกแบบเกียรติบัตรแบบทดสอบ' : 'ระบบออกแบบเกียรติบัตรอัจฉริยะ'), 'admin');
 ?>
 <!-- นำเข้า Google Fonts ภาษาไทย และ CDN Libraries สำหรับ Export -->
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Charm:wght@400;700&family=Mitr:wght@300;400;500;600&family=Chakra+Petch:wght@300;400;500;600;700&family=Sriracha&display=swap" rel="stylesheet">
@@ -256,19 +294,24 @@ render_header('ระบบออกแบบเกียรติบัตร�
     <!-- แถบด้านซ้าย: แผงควบคุมและฟอร์มเครื่องมือ -->
     <div class="w-full xl:w-[440px] bg-slate-800 border-r border-slate-700 flex flex-col max-h-none xl:max-h-[calc(100vh-64px)] overflow-y-auto">
         <div class="p-6 border-b border-slate-700">
-            <a href="index.php" class="text-xs font-bold text-teal-400 hover:underline">← กลับหลังบ้าน</a>
+            <a href="<?= e($backUrl) ?>" class="text-xs font-bold text-teal-400 hover:underline">← <?= $isPublicQuizDesigner ? 'กลับไปตั้งค่าการแชร์' : 'กลับหลังบ้าน' ?></a>
             <h1 class="text-2xl font-black mt-2 text-white flex items-center gap-2">
-                🎨 ออกแบบเกียรติบัตร A4
+                🎨 <?= $isPublicQuizDesigner ? 'เกียรติบัตรเฉพาะแบบทดสอบ' : 'ออกแบบเกียรติบัตร A4' ?>
             </h1>
+            <?php if ($isPublicQuizDesigner): ?>
+                <p class="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-sm font-bold text-amber-200"><?= e($certificateSubjectTitle) ?></p>
+            <?php endif; ?>
             <p class="text-xs text-slate-400 mt-1">ลาก วาง ย่อขยาย หมุน และส่งออกเป็น PNG/PDF ขนาด A4 ได้ทันที</p>
             <p class="text-xs text-teal-300 mt-2">คลิกหรือลากข้อความเพื่อจัดตำแหน่ง ดับเบิลคลิกข้อความเมื่อต้องการแก้ไขในเกียรติบัตร</p>
         </div>
 
         <form id="settings-form" method="post" enctype="multipart/form-data" class="p-6 space-y-6">
+            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <!-- เก็บพิกัด JSON ขนาด และการหมุนทั้งหมด -->
             <input type="hidden" id="positions" name="positions" value="<?= e(json_encode($positions, JSON_UNESCAPED_UNICODE)) ?>">
 
             <!-- ส่วนหัวข้อหลักสูตร -->
+            <?php if (!$isPublicQuizDesigner): ?>
             <div>
                 <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider" for="course_id">หลักสูตรที่กำลังตั้งค่า</label>
                 <select id="course_id" name="course_id" onchange="window.location.href='?course_id=' + this.value" class="mt-2 w-full rounded-lg border border-slate-600 bg-slate-700 text-white px-3 py-2 text-sm focus:border-teal-400 focus:outline-none">
@@ -277,11 +320,18 @@ render_header('ระบบออกแบบเกียรติบัตร�
                     <?php endforeach; ?>
                 </select>
             </div>
+            <?php else: ?>
+            <div class="rounded-lg border border-slate-700 bg-slate-900/50 p-4">
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-400">ประเภทแม่แบบ</p>
+                <strong class="mt-1 block text-sm text-white">แบบทดสอบสาธารณะ · แยกจากหลักสูตร</strong>
+                <p class="mt-1 text-xs leading-5 text-slate-400">การแก้ไขหน้านี้ไม่เปลี่ยนแม่แบบเกียรติบัตรของหลักสูตร <?= e((string) $course['title']) ?></p>
+            </div>
+            <?php endif; ?>
 
             <!-- ใช้ layout ที่จัดไว้แล้วจากหลักสูตรอื่น -->
             <div class="rounded-lg border border-teal-500/30 bg-teal-950/30 p-4">
-                <h3 class="text-sm font-bold text-teal-300">ใช้ตำแหน่งจากหลักสูตรอื่น</h3>
-                <p class="mt-1 text-xs leading-5 text-slate-400">คัดลอกตำแหน่ง ขนาด การหมุน ฟอนต์ และสี โดยยังคงรูปภาพและข้อความหลักของหลักสูตรนี้ไว้</p>
+                <h3 class="text-sm font-bold text-teal-300"><?= $isPublicQuizDesigner ? 'เริ่มจากแม่แบบหลักสูตร' : 'ใช้ตำแหน่งจากหลักสูตรอื่น' ?></h3>
+                <p class="mt-1 text-xs leading-5 text-slate-400"><?= $isPublicQuizDesigner ? 'คัดลอกรูปภาพ ผู้ลงนาม รูปแบบ และตำแหน่งมาเป็นจุดเริ่มต้น โดยยังคงหัวข้อและข้อความรับรองเฉพาะแบบทดสอบนี้ไว้' : 'คัดลอกตำแหน่ง ขนาด การหมุน ฟอนต์ และสี โดยยังคงรูปภาพและข้อความหลักของหลักสูตรนี้ไว้' ?></p>
                 <?php if ($layoutCourses): ?>
                     <label class="mt-3 block text-xs font-semibold text-slate-400" for="layout_source_course_id">เลือกหลักสูตรต้นแบบ</label>
                     <select id="layout_source_course_id" name="layout_source_course_id" class="mt-1.5 w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-xs text-white focus:border-teal-400 focus:outline-none">
@@ -296,7 +346,7 @@ render_header('ระบบออกแบบเกียรติบัตร�
                         value="copy_layout"
                         onclick="if (!document.getElementById('layout_source_course_id').value) { alert('กรุณาเลือกหลักสูตรต้นแบบก่อน'); return false; } return confirm('นำตำแหน่งจากหลักสูตรต้นแบบมาใช้แทนตำแหน่งปัจจุบันหรือไม่?')"
                         class="mt-3 w-full rounded-lg border border-teal-500/40 bg-teal-600/20 px-3 py-2 text-xs font-bold text-teal-200 transition-colors hover:bg-teal-600/30">
-                        ใช้ตำแหน่งจากหลักสูตรที่เลือก
+                        <?= $isPublicQuizDesigner ? 'คัดลอกแม่แบบหลักสูตรที่เลือก' : 'ใช้ตำแหน่งจากหลักสูตรที่เลือก' ?>
                     </button>
                 <?php else: ?>
                     <p class="mt-3 rounded-md bg-slate-900/50 px-3 py-2 text-xs text-slate-500">ยังไม่มีหลักสูตรอื่นที่บันทึกตำแหน่งไว้</p>
@@ -454,7 +504,7 @@ render_header('ระบบออกแบบเกียรติบัตร�
                     <div>
                         <label class="block text-xs font-semibold text-slate-400" for="body_text">ข้อความคำรับรอง</label>
                         <textarea id="body_text" name="body_text" rows="3" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:border-teal-400" oninput="syncCanvasText('body','body_text',this.value)"><?= e($settings['body_text'] ?? '') ?></textarea>
-                        <p class="text-[10px] text-slate-400 mt-1">ใช้ตัวแปรได้: {{name}} (ผู้เรียน), {{course}} (วิชา), {{code}} (รหัสเกียรติบัตร), {{date}} (วันที่)</p>
+                        <p class="text-[10px] text-slate-400 mt-1">ใช้ตัวแปรได้: {{name}} (ผู้รับ), {{course}} (<?= $isPublicQuizDesigner ? 'ชื่อแบบทดสอบ' : 'วิชา' ?>), {{code}} (รหัสเกียรติบัตร), {{date}} (วันที่)</p>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-400" for="signature_name">ชื่อผู้ลงนาม</label>
@@ -469,7 +519,7 @@ render_header('ระบบออกแบบเกียรติบัตร�
 
             <!-- ปุ่มบันทึกข้อมูลหลักสูตร -->
             <button type="submit" class="w-full rounded-lg bg-teal-600 hover:bg-teal-700 px-4 py-3 text-sm font-bold text-white shadow-lg flex items-center justify-center gap-2 transition-colors">
-                💾 บันทึกแบบเกียรติบัตรลงระบบ
+                💾 <?= $isPublicQuizDesigner ? 'บันทึกแม่แบบเฉพาะแบบทดสอบ' : 'บันทึกแบบเกียรติบัตรลงระบบ' ?>
             </button>
         </form>
     </div>
@@ -1238,7 +1288,7 @@ render_header('ระบบออกแบบเกียรติบัตร�
     window.exportAsPNG = () => {
         renderPreviewToCanvas().then(canvas => {
             const link = document.createElement('a');
-            link.download = 'เกียรติบัตร-<?= e($course['title']) ?>.png';
+            link.download = <?= json_encode('เกียรติบัตร-' . $certificateSubjectTitle . '.png', JSON_UNESCAPED_UNICODE) ?>;
             link.href = canvas.toDataURL('image/png');
             link.click();
         });
@@ -1304,7 +1354,7 @@ render_header('ระบบออกแบบเกียรติบัตร�
         renderPreviewToCanvas()
             .then(canvas => downloadBlob(
                 createOptimizedPdfBlob(canvas),
-                'เกียรติบัตร-<?= e($course['title']) ?>.pdf'
+                <?= json_encode('เกียรติบัตร-' . $certificateSubjectTitle . '.pdf', JSON_UNESCAPED_UNICODE) ?>
             ))
             .catch(error => alert(error.message || 'สร้างไฟล์ PDF ไม่สำเร็จ'));
     };

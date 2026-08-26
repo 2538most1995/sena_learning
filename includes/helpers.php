@@ -690,6 +690,7 @@ function certificate_attempt_by_code(string $certificateCode): ?array
                 c.category AS course_category,
                 c.cover_url AS course_cover_url,
                 pqs.pass_percent,
+                pqs.certificate_mode,
                 c.certificate_title,
                 1 AS allow_retake,
                 pqa.submitted_at AS issued_at,
@@ -1138,6 +1139,146 @@ function copy_certificate_layout_positions(int $sourceCourseId, int $targetCours
     $stmt->execute([
         $targetCourseId,
         json_encode($positions, JSON_UNESCAPED_UNICODE),
+    ]);
+}
+
+function get_public_quiz_certificate_settings(int $shareId): array
+{
+    ensure_public_quiz_sharing_tables();
+    $stmt = db()->prepare('SELECT * FROM public_quiz_certificate_settings WHERE share_id = ?');
+    $stmt->execute([$shareId]);
+    $settings = $stmt->fetch() ?: [];
+
+    $settings['issuer_name'] = $settings['issuer_name'] ?? CERTIFICATE_ISSUER;
+    $settings['signature_name'] = $settings['signature_name'] ?? 'ผู้รับรองผลการทดสอบ';
+    $settings['title_text'] = $settings['title_text'] ?? 'เกียรติบัตรการผ่านแบบทดสอบ';
+    $settings['body_text'] = $settings['body_text'] ?? 'เพื่อแสดงว่า {{name}} ได้ผ่านแบบทดสอบ {{course}} ตามเกณฑ์คะแนนที่กำหนด';
+    $settings['schema_version'] = (int) ($settings['schema_version'] ?? 1);
+    $settings['positions'] = clean_certificate_positions((string) ($settings['positions'] ?? ''));
+    $settings['positions']['logo'] = normalize_certificate_image_position(
+        $settings['positions']['logo'],
+        $settings['logo_image'] ?? null
+    );
+    $settings['positions']['signature_image'] = normalize_certificate_image_position(
+        $settings['positions']['signature_image'],
+        $settings['signature_image'] ?? null
+    );
+
+    return $settings;
+}
+
+function save_public_quiz_certificate_upload(string $field, int $shareId): ?string
+{
+    if (empty($_FILES[$field]['tmp_name']) || !is_uploaded_file($_FILES[$field]['tmp_name'])) {
+        return null;
+    }
+
+    $allowed = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'];
+    $mime = mime_content_type($_FILES[$field]['tmp_name']) ?: '';
+    if (!isset($allowed[$mime])) {
+        throw new RuntimeException('ไฟล์ ' . $field . ' ต้องเป็น PNG, JPG หรือ WEBP');
+    }
+
+    $dir = __DIR__ . '/../storage/uploads/certificates';
+    if (!is_dir($dir)) {
+        mkdir($dir, 0775, true);
+    }
+    $filename = 'quiz-share-' . $shareId . '-' . $field . '-' . time() . '-' . substr(generate_token(3), 0, 6) . '.' . $allowed[$mime];
+    if (!move_uploaded_file($_FILES[$field]['tmp_name'], $dir . '/' . $filename)) {
+        throw new RuntimeException('อัปโหลดไฟล์ไม่สำเร็จ');
+    }
+
+    return 'storage/uploads/certificates/' . $filename;
+}
+
+function save_public_quiz_certificate_settings(int $shareId, array $data): void
+{
+    $share = public_quiz_share_by_id($shareId);
+    if (!$share) {
+        throw new RuntimeException('ไม่พบลิงก์แบบทดสอบที่ต้องการออกแบบเกียรติบัตร');
+    }
+    $current = get_public_quiz_certificate_settings($shareId);
+    $uploads = [];
+    foreach (['background_image', 'logo_image', 'signature_image'] as $field) {
+        $uploaded = save_public_quiz_certificate_upload($field, $shareId);
+        if ($uploaded !== null) {
+            $uploads[$field] = $uploaded;
+        } elseif ($field === 'background_image' && array_key_exists('existing_background_image', $data)) {
+            $uploads[$field] = trim((string) $data['existing_background_image']) ?: null;
+        } else {
+            $uploads[$field] = !empty($data['existing_' . $field])
+                ? trim((string) $data['existing_' . $field])
+                : ($current[$field] ?? null);
+        }
+    }
+
+    $positions = clean_certificate_positions((string) ($data['positions'] ?? ''));
+    $stmt = db()->prepare(
+        'INSERT INTO public_quiz_certificate_settings
+            (share_id, background_image, logo_image, signature_image, issuer_name, signature_name, title_text, body_text, positions, schema_version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+         ON DUPLICATE KEY UPDATE
+            background_image = VALUES(background_image),
+            logo_image = VALUES(logo_image),
+            signature_image = VALUES(signature_image),
+            issuer_name = VALUES(issuer_name),
+            signature_name = VALUES(signature_name),
+            title_text = VALUES(title_text),
+            body_text = VALUES(body_text),
+            positions = VALUES(positions),
+            schema_version = 1,
+            updated_at = NOW()'
+    );
+    $stmt->execute([
+        $shareId,
+        $uploads['background_image'],
+        $uploads['logo_image'],
+        $uploads['signature_image'],
+        trim((string) ($data['issuer_name'] ?? CERTIFICATE_ISSUER)) ?: CERTIFICATE_ISSUER,
+        trim((string) ($data['signature_name'] ?? 'ผู้รับรองผลการทดสอบ')) ?: 'ผู้รับรองผลการทดสอบ',
+        trim((string) ($data['title_text'] ?? 'เกียรติบัตรการผ่านแบบทดสอบ')) ?: 'เกียรติบัตรการผ่านแบบทดสอบ',
+        trim((string) ($data['body_text'] ?? '')),
+        json_encode($positions, JSON_UNESCAPED_UNICODE),
+    ]);
+}
+
+function copy_course_certificate_to_public_quiz(int $sourceCourseId, int $targetShareId): void
+{
+    if ($sourceCourseId <= 0 || !public_quiz_share_by_id($targetShareId)) {
+        throw new RuntimeException('กรุณาเลือกหลักสูตรต้นแบบที่ถูกต้อง');
+    }
+    $stmt = db()->prepare('SELECT COUNT(*) FROM certificate_settings WHERE course_id = ?');
+    $stmt->execute([$sourceCourseId]);
+    if ((int) $stmt->fetchColumn() === 0) {
+        throw new RuntimeException('หลักสูตรต้นแบบนี้ยังไม่มีแม่แบบเกียรติบัตร');
+    }
+
+    $source = get_certificate_settings($sourceCourseId);
+    $target = get_public_quiz_certificate_settings($targetShareId);
+    $stmt = db()->prepare(
+        'INSERT INTO public_quiz_certificate_settings
+            (share_id, background_image, logo_image, signature_image, issuer_name, signature_name, title_text, body_text, positions, schema_version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+         ON DUPLICATE KEY UPDATE
+            background_image = VALUES(background_image),
+            logo_image = VALUES(logo_image),
+            signature_image = VALUES(signature_image),
+            issuer_name = VALUES(issuer_name),
+            signature_name = VALUES(signature_name),
+            positions = VALUES(positions),
+            schema_version = 1,
+            updated_at = NOW()'
+    );
+    $stmt->execute([
+        $targetShareId,
+        $source['background_image'] ?? null,
+        $source['logo_image'] ?? null,
+        $source['signature_image'] ?? null,
+        $source['issuer_name'],
+        $source['signature_name'],
+        $target['title_text'],
+        $target['body_text'],
+        json_encode(clean_certificate_positions(json_encode($source['positions'], JSON_UNESCAPED_UNICODE)), JSON_UNESCAPED_UNICODE),
     ]);
 }
 
@@ -1664,6 +1805,12 @@ function normalize_public_quiz_theme(?string $theme): string
     return array_key_exists($theme, public_quiz_themes()) ? $theme : 'ocean';
 }
 
+function normalize_public_quiz_certificate_mode(?string $mode): string
+{
+    $mode = trim((string) $mode);
+    return in_array($mode, ['none', 'course', 'custom'], true) ? $mode : 'course';
+}
+
 function ensure_public_quiz_sharing_tables(): void
 {
     ensure_curriculum_tables();
@@ -1681,6 +1828,7 @@ function ensure_public_quiz_sharing_tables(): void
             welcome_message TEXT NULL,
             pass_percent DECIMAL(5,2) NOT NULL DEFAULT 80,
             certificate_enabled TINYINT(1) NOT NULL DEFAULT 1,
+            certificate_mode VARCHAR(20) NOT NULL DEFAULT 'course',
             theme VARCHAR(30) NOT NULL DEFAULT 'ocean',
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1699,6 +1847,7 @@ function ensure_public_quiz_sharing_tables(): void
             percent DECIMAL(5,2) NULL,
             status ENUM('started','submitted','passed') NOT NULL DEFAULT 'started',
             certificate_code VARCHAR(80) NULL UNIQUE,
+            certificate_template_mode VARCHAR(20) NULL,
             started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             submitted_at TIMESTAMP NULL,
             KEY public_quiz_attempts_share_lookup (share_id, started_at),
@@ -1719,6 +1868,37 @@ function ensure_public_quiz_sharing_tables(): void
             CONSTRAINT public_quiz_answers_question_fk FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS public_quiz_certificate_settings (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            share_id INT UNSIGNED NOT NULL UNIQUE,
+            background_image VARCHAR(500) NULL,
+            logo_image VARCHAR(500) NULL,
+            signature_image VARCHAR(500) NULL,
+            issuer_name VARCHAR(255) NOT NULL DEFAULT 'SENA Learning Center',
+            signature_name VARCHAR(255) NOT NULL DEFAULT 'ผู้รับรองผลการทดสอบ',
+            title_text VARCHAR(255) NOT NULL DEFAULT 'เกียรติบัตรการผ่านแบบทดสอบ',
+            body_text TEXT NULL,
+            positions JSON NULL,
+            schema_version SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            CONSTRAINT public_quiz_certificate_settings_share_fk FOREIGN KEY (share_id) REFERENCES public_quiz_shares(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    if (!database_column_exists('public_quiz_shares', 'certificate_mode')) {
+        db()->exec("ALTER TABLE public_quiz_shares ADD certificate_mode VARCHAR(20) NOT NULL DEFAULT 'course' AFTER certificate_enabled");
+        db()->exec("UPDATE public_quiz_shares SET certificate_mode = 'none' WHERE certificate_enabled = 0");
+    }
+    if (!database_column_exists('public_quiz_attempts', 'certificate_template_mode')) {
+        db()->exec('ALTER TABLE public_quiz_attempts ADD certificate_template_mode VARCHAR(20) NULL AFTER certificate_code');
+        db()->exec(
+            "UPDATE public_quiz_attempts
+             SET certificate_template_mode = 'course'
+             WHERE certificate_code IS NOT NULL AND certificate_template_mode IS NULL"
+        );
+    }
 
     $checked = true;
 }
@@ -1739,6 +1919,28 @@ function public_quiz_share_for_set(int $quizSetId): ?array
          WHERE pqs.quiz_set_id = ?'
     );
     $stmt->execute([$quizSetId]);
+    $share = $stmt->fetch();
+    return $share ?: null;
+}
+
+function public_quiz_share_by_id(int $shareId): ?array
+{
+    ensure_public_quiz_sharing_tables();
+    if ($shareId <= 0) {
+        return null;
+    }
+    $stmt = db()->prepare(
+        'SELECT pqs.*, qs.title AS quiz_set_title, qs.description AS quiz_set_description,
+                qs.shuffle_questions, qs.shuffle_choices, qs.course_id,
+                c.title AS course_title,
+                (SELECT COUNT(*) FROM quiz_set_questions qsq WHERE qsq.quiz_set_id = qs.id) AS question_count
+         FROM public_quiz_shares pqs
+         INNER JOIN quiz_sets qs ON qs.id = pqs.quiz_set_id
+         INNER JOIN courses c ON c.id = qs.course_id
+         WHERE pqs.id = ?
+         LIMIT 1'
+    );
+    $stmt->execute([$shareId]);
     $share = $stmt->fetch();
     return $share ?: null;
 }
@@ -1791,15 +1993,19 @@ function save_public_quiz_share(int $quizSetId, array $data): array
 
     $current = public_quiz_share_for_set($quizSetId);
     $shareToken = (string) ($current['share_token'] ?? generate_token(24));
+    $certificateMode = array_key_exists('certificate_mode', $data)
+        ? normalize_public_quiz_certificate_mode((string) $data['certificate_mode'])
+        : (!empty($data['certificate_enabled']) ? 'course' : 'none');
     $stmt = db()->prepare(
         'INSERT INTO public_quiz_shares
-            (quiz_set_id, share_token, public_title, welcome_message, pass_percent, certificate_enabled, theme, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (quiz_set_id, share_token, public_title, welcome_message, pass_percent, certificate_enabled, certificate_mode, theme, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
             public_title = VALUES(public_title),
             welcome_message = VALUES(welcome_message),
             pass_percent = VALUES(pass_percent),
             certificate_enabled = VALUES(certificate_enabled),
+            certificate_mode = VALUES(certificate_mode),
             theme = VALUES(theme),
             is_active = VALUES(is_active),
             updated_at = NOW()'
@@ -1810,7 +2016,8 @@ function save_public_quiz_share(int $quizSetId, array $data): array
         $title,
         $welcomeMessage,
         round($passPercent, 2),
-        !empty($data['certificate_enabled']) ? 1 : 0,
+        $certificateMode === 'none' ? 0 : 1,
+        $certificateMode,
         normalize_public_quiz_theme((string) ($data['theme'] ?? 'ocean')),
         !empty($data['is_active']) ? 1 : 0,
     ]);
@@ -1851,7 +2058,7 @@ function public_quiz_attempt(int $attemptId, string $accessToken): ?array
     }
     $stmt = db()->prepare(
         'SELECT pqa.*, pqs.quiz_set_id, pqs.share_token, pqs.public_title, pqs.welcome_message,
-                pqs.pass_percent, pqs.certificate_enabled, pqs.theme, pqs.is_active,
+                pqs.pass_percent, pqs.certificate_enabled, pqs.certificate_mode, pqs.theme, pqs.is_active,
                 qs.course_id, qs.title AS quiz_set_title, qs.shuffle_questions, qs.shuffle_choices,
                 c.title AS course_title
          FROM public_quiz_attempts pqa
@@ -1920,12 +2127,13 @@ function submit_public_quiz_attempt(array $attempt, array $share, array $submitt
         $total = count($questions);
         $percent = round(($correct / $total) * 100, 2);
         $passed = $percent >= (float) $share['pass_percent'];
-        $certificateCode = $passed && (int) $share['certificate_enabled'] === 1
+        $certificateMode = normalize_public_quiz_certificate_mode((string) ($share['certificate_mode'] ?? 'course'));
+        $certificateCode = $passed && $certificateMode !== 'none'
             ? 'SENA-Q-' . date('Ymd') . '-' . strtoupper(substr(generate_token(5), 0, 10))
             : null;
         $update = $pdo->prepare(
             'UPDATE public_quiz_attempts
-             SET score = ?, total = ?, percent = ?, status = ?, certificate_code = ?, submitted_at = NOW()
+             SET score = ?, total = ?, percent = ?, status = ?, certificate_code = ?, certificate_template_mode = ?, submitted_at = NOW()
              WHERE id = ?'
         );
         $update->execute([
@@ -1934,6 +2142,7 @@ function submit_public_quiz_attempt(array $attempt, array $share, array $submitt
             $percent,
             $passed ? 'passed' : 'submitted',
             $certificateCode,
+            $certificateCode !== null ? $certificateMode : null,
             (int) $attempt['id'],
         ]);
         $pdo->commit();

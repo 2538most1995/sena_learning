@@ -162,7 +162,11 @@ Store reusable central quiz sets and their ordered questions. Quiz placement is 
 
 ### `public_quiz_shares`, `public_quiz_attempts`, and `public_quiz_answers`
 
-Store permanent public share tokens for reusable quiz sets, theme/pass/certificate settings, guest quiz attempts, scores, and submitted answers. Share links have no automatic expiry and may be manually deactivated without changing their token.
+Store permanent public share tokens for reusable quiz sets, theme/pass/certificate mode settings, guest quiz attempts, scores, and submitted answers. Share links have no automatic expiry and may be manually deactivated without changing their token. Each issued attempt records whether it used the course certificate template or the quiz-specific template so later configuration changes do not switch an issued certificate's template source.
+
+### `public_quiz_certificate_settings`
+
+Stores the versioned certificate assets, text, signer information, and normalized layout positions for a public quiz share. Quiz-specific templates use the same `1024 × 724` renderer as course certificates but do not modify `certificate_settings` for the owner course.
 
 ### `question_progress`
 
@@ -207,6 +211,7 @@ Stores certificate assets, text, and JSON layout positions for each course.
 - Admins can publish a permanent no-login link for a quiz set and download its QR Code.
 - Public quiz attempts use their own access token and never bypass a normal course attempt or curriculum gate.
 - Public quizzes support five visual themes and may issue a certificate from the owner course template when the configured pass threshold is met.
+- Public quiz certificate mode is `none`, `course`, or `custom`. Custom mode has an independent certificate designer and can copy a course template as a visual starting point without replacing quiz-specific title or body text.
 
 ### Course Cover Images
 

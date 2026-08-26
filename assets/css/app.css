@@ -1730,6 +1730,11 @@ a:hover > .auth-site-logo {
     transform: scale(0.98);
 }
 
+.certificate-mode-option:has(input:focus-visible) {
+    border-color: #0f766e;
+    box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.16);
+}
+
 .quiz-theme-option--ocean { --theme-swatch: #0f766e; }
 .quiz-theme-option--sunrise { --theme-swatch: #c2410c; }
 .quiz-theme-option--forest { --theme-swatch: #15803d; }

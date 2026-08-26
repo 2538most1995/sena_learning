@@ -28,8 +28,13 @@ if (!$attempt) {
     exit;
 }
 
-$settings = get_certificate_settings((int) $attempt['course_id']);
 $isPublicQuizCertificate = ($attempt['certificate_source'] ?? '') === 'public_quiz';
+$certificateTemplateMode = $isPublicQuizCertificate
+    ? normalize_public_quiz_certificate_mode((string) ($attempt['certificate_template_mode'] ?? $attempt['certificate_mode'] ?? 'course'))
+    : 'course';
+$settings = $isPublicQuizCertificate && $certificateTemplateMode === 'custom'
+    ? get_public_quiz_certificate_settings((int) $attempt['share_id'])
+    : get_certificate_settings((int) $attempt['course_id']);
 if ($isPublicQuizCertificate) {
     if ((string) $settings['title_text'] === 'เกียรติบัตรการผ่านหลักสูตร') {
         $settings['title_text'] = 'เกียรติบัตรการผ่านแบบทดสอบ';
