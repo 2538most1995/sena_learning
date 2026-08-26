@@ -123,6 +123,50 @@ CREATE TABLE IF NOT EXISTS quiz_set_questions (
     CONSTRAINT quiz_set_questions_question_fk FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS public_quiz_shares (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    quiz_set_id INT UNSIGNED NOT NULL UNIQUE,
+    share_token VARCHAR(64) NOT NULL UNIQUE,
+    public_title VARCHAR(255) NOT NULL,
+    welcome_message TEXT NULL,
+    pass_percent DECIMAL(5,2) NOT NULL DEFAULT 80,
+    certificate_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    theme VARCHAR(30) NOT NULL DEFAULT 'ocean',
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT public_quiz_shares_set_fk FOREIGN KEY (quiz_set_id) REFERENCES quiz_sets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS public_quiz_attempts (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    share_id INT UNSIGNED NOT NULL,
+    learner_name VARCHAR(255) NOT NULL,
+    access_token VARCHAR(64) NOT NULL UNIQUE,
+    score INT NULL,
+    total INT NULL,
+    percent DECIMAL(5,2) NULL,
+    status ENUM('started','submitted','passed') NOT NULL DEFAULT 'started',
+    certificate_code VARCHAR(80) NULL UNIQUE,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    submitted_at TIMESTAMP NULL,
+    KEY public_quiz_attempts_share_lookup (share_id, started_at),
+    CONSTRAINT public_quiz_attempts_share_fk FOREIGN KEY (share_id) REFERENCES public_quiz_shares(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS public_quiz_answers (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    attempt_id INT UNSIGNED NOT NULL,
+    question_id INT UNSIGNED NOT NULL,
+    submitted_answers JSON NULL,
+    is_correct TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY public_quiz_answer_unique (attempt_id, question_id),
+    KEY public_quiz_answer_question_lookup (question_id),
+    CONSTRAINT public_quiz_answers_attempt_fk FOREIGN KEY (attempt_id) REFERENCES public_quiz_attempts(id) ON DELETE CASCADE,
+    CONSTRAINT public_quiz_answers_question_fk FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS curriculum_sections (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     course_id INT UNSIGNED NOT NULL,

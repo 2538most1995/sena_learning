@@ -63,6 +63,7 @@ public certificate URL for passed courses.
 | `result.php` | Show post-test result and certificate eligibility |
 | `certificate.php` | Render certificate output and export PNG/PDF |
 | `certificate_view.php` | Public read-only certificate view by certificate code |
+| `shared_quiz.php` | Permanent public quiz link, guest name collection, scoring, result, and certificate handoff |
 | `api/student_courses.php` | Authenticated JSON export for student course progress and certificates |
 
 ### Admin Routes
@@ -159,6 +160,10 @@ Stores editable curriculum sections. Admins can create, rename, reorder, and rem
 
 Store reusable central quiz sets and their ordered questions. Quiz placement is independent from legacy pre/post labels.
 
+### `public_quiz_shares`, `public_quiz_attempts`, and `public_quiz_answers`
+
+Store permanent public share tokens for reusable quiz sets, theme/pass/certificate settings, guest quiz attempts, scores, and submitted answers. Share links have no automatic expiry and may be manually deactivated without changing their token.
+
 ### `question_progress`
 
 Records each learner answer, correctness, and completion timestamp for questions answered inside a curriculum quiz set.
@@ -199,6 +204,9 @@ Stores certificate assets, text, and JSON layout positions for each course.
 - Scoring is server-side in `score_curriculum_question()`.
 - Multiple-choice answers are sorted before comparison.
 - Short answers are trimmed, lowercased, and whitespace-normalized.
+- Admins can publish a permanent no-login link for a quiz set and download its QR Code.
+- Public quiz attempts use their own access token and never bypass a normal course attempt or curriculum gate.
+- Public quizzes support five visual themes and may issue a certificate from the owner course template when the configured pass threshold is met.
 
 ### Course Cover Images
 

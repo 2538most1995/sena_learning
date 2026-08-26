@@ -29,6 +29,16 @@ if (!$attempt) {
 }
 
 $settings = get_certificate_settings((int) $attempt['course_id']);
+$isPublicQuizCertificate = ($attempt['certificate_source'] ?? '') === 'public_quiz';
+if ($isPublicQuizCertificate) {
+    if ((string) $settings['title_text'] === 'เกียรติบัตรการผ่านหลักสูตร') {
+        $settings['title_text'] = 'เกียรติบัตรการผ่านแบบทดสอบ';
+    }
+    if ((string) $settings['body_text'] === 'เพื่อแสดงว่าได้ผ่านการเรียนรู้ในหลักสูตร {{course}} โดยผ่านแบบทดสอบหลังเรียนตามเกณฑ์ที่กำหนด') {
+        $settings['body_text'] = 'เพื่อแสดงว่าได้ทำแบบทดสอบ {{course}} และผ่านเกณฑ์คะแนนที่กำหนด';
+    }
+}
+$certificateTypeLabel = $isPublicQuizCertificate ? 'เกียรติบัตรผ่านแบบทดสอบ' : 'เกียรติบัตรผ่านหลักสูตร';
 
 render_header('เกียรติบัตร ' . (string) $attempt['learner_name'], 'learn');
 ?>
@@ -37,7 +47,7 @@ render_header('เกียรติบัตร ' . (string) $attempt['learner_
 <script src="<?= e(app_base_url()) ?>/assets/vendor/jspdf-2.5.1.umd.min.js"></script>
 <section class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
     <div class="mb-5 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <p class="text-sm font-bold text-sea">เกียรติบัตรผ่านหลักสูตร</p>
+        <p class="text-sm font-bold text-sea"><?= e($certificateTypeLabel) ?></p>
         <h1 class="mt-1 text-2xl font-extrabold text-ink"><?= e((string) $attempt['learner_name']) ?></h1>
         <p class="mt-1 text-sm text-slate-600"><?= e((string) $attempt['course_title']) ?></p>
         <p class="mt-2 text-xs font-semibold text-slate-500">รหัสเกียรติบัตร <?= e((string) $attempt['certificate_code']) ?></p>

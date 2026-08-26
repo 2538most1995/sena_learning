@@ -668,10 +668,37 @@ function certificate_attempt_by_code(string $certificateCode): ?array
                 c.cover_url AS course_cover_url,
                 c.pass_percent,
                 c.certificate_title,
-                c.allow_retake
+                c.allow_retake,
+                "course" AS certificate_source
          FROM attempts a
          INNER JOIN courses c ON c.id = a.course_id
          WHERE a.certificate_code = ? AND a.status = "passed"
+         LIMIT 1'
+    );
+    $stmt->execute([$certificateCode]);
+    $attempt = $stmt->fetch();
+    if ($attempt) {
+        return $attempt;
+    }
+
+    ensure_public_quiz_sharing_tables();
+    $stmt = db()->prepare(
+        'SELECT pqa.*,
+                qs.course_id,
+                pqs.public_title AS course_title,
+                pqs.welcome_message AS course_description,
+                c.category AS course_category,
+                c.cover_url AS course_cover_url,
+                pqs.pass_percent,
+                c.certificate_title,
+                1 AS allow_retake,
+                pqa.submitted_at AS issued_at,
+                "public_quiz" AS certificate_source
+         FROM public_quiz_attempts pqa
+         INNER JOIN public_quiz_shares pqs ON pqs.id = pqa.share_id
+         INNER JOIN quiz_sets qs ON qs.id = pqs.quiz_set_id
+         INNER JOIN courses c ON c.id = qs.course_id
+         WHERE pqa.certificate_code = ? AND pqa.status = "passed"
          LIMIT 1'
     );
     $stmt->execute([$certificateCode]);
@@ -1618,6 +1645,310 @@ function quiz_set_questions(int $quizSetId): array
     );
     $stmt->execute([$quizSetId]);
     return $stmt->fetchAll();
+}
+
+function public_quiz_themes(): array
+{
+    return [
+        'ocean' => ['label' => 'ทะเลเสนา', 'description' => 'ฟ้าอมเขียว สุภาพ อ่านง่าย'],
+        'sunrise' => ['label' => 'แสงอรุณ', 'description' => 'ส้มอุ่น สดใส เป็นกันเอง'],
+        'forest' => ['label' => 'สวนเรียนรู้', 'description' => 'เขียวธรรมชาติ สงบ มีสมาธิ'],
+        'orchid' => ['label' => 'กล้วยไม้', 'description' => 'ม่วงนุ่มนวล ดูสร้างสรรค์'],
+        'festival' => ['label' => 'งานวัด', 'description' => 'ชมพู–ทอง สนุกและมีพลัง'],
+    ];
+}
+
+function normalize_public_quiz_theme(?string $theme): string
+{
+    $theme = trim((string) $theme);
+    return array_key_exists($theme, public_quiz_themes()) ? $theme : 'ocean';
+}
+
+function ensure_public_quiz_sharing_tables(): void
+{
+    ensure_curriculum_tables();
+    static $checked = false;
+    if ($checked) {
+        return;
+    }
+
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS public_quiz_shares (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            quiz_set_id INT UNSIGNED NOT NULL UNIQUE,
+            share_token VARCHAR(64) NOT NULL UNIQUE,
+            public_title VARCHAR(255) NOT NULL,
+            welcome_message TEXT NULL,
+            pass_percent DECIMAL(5,2) NOT NULL DEFAULT 80,
+            certificate_enabled TINYINT(1) NOT NULL DEFAULT 1,
+            theme VARCHAR(30) NOT NULL DEFAULT 'ocean',
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            CONSTRAINT public_quiz_shares_set_fk FOREIGN KEY (quiz_set_id) REFERENCES quiz_sets(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS public_quiz_attempts (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            share_id INT UNSIGNED NOT NULL,
+            learner_name VARCHAR(255) NOT NULL,
+            access_token VARCHAR(64) NOT NULL UNIQUE,
+            score INT NULL,
+            total INT NULL,
+            percent DECIMAL(5,2) NULL,
+            status ENUM('started','submitted','passed') NOT NULL DEFAULT 'started',
+            certificate_code VARCHAR(80) NULL UNIQUE,
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            submitted_at TIMESTAMP NULL,
+            KEY public_quiz_attempts_share_lookup (share_id, started_at),
+            CONSTRAINT public_quiz_attempts_share_fk FOREIGN KEY (share_id) REFERENCES public_quiz_shares(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    db()->exec(
+        "CREATE TABLE IF NOT EXISTS public_quiz_answers (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            attempt_id INT UNSIGNED NOT NULL,
+            question_id INT UNSIGNED NOT NULL,
+            submitted_answers JSON NULL,
+            is_correct TINYINT(1) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY public_quiz_answer_unique (attempt_id, question_id),
+            KEY public_quiz_answer_question_lookup (question_id),
+            CONSTRAINT public_quiz_answers_attempt_fk FOREIGN KEY (attempt_id) REFERENCES public_quiz_attempts(id) ON DELETE CASCADE,
+            CONSTRAINT public_quiz_answers_question_fk FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    $checked = true;
+}
+
+function public_quiz_share_for_set(int $quizSetId): ?array
+{
+    ensure_public_quiz_sharing_tables();
+    $stmt = db()->prepare(
+        'SELECT pqs.*, qs.title AS quiz_set_title, qs.description AS quiz_set_description,
+                qs.shuffle_questions, qs.shuffle_choices, qs.course_id,
+                c.title AS course_title,
+                (SELECT COUNT(*) FROM quiz_set_questions qsq WHERE qsq.quiz_set_id = qs.id) AS question_count,
+                (SELECT COUNT(*) FROM public_quiz_attempts pqa WHERE pqa.share_id = pqs.id AND pqa.status != "started") AS attempt_count,
+                (SELECT COUNT(*) FROM public_quiz_attempts pqa WHERE pqa.share_id = pqs.id AND pqa.status = "passed") AS passed_count
+         FROM public_quiz_shares pqs
+         INNER JOIN quiz_sets qs ON qs.id = pqs.quiz_set_id
+         INNER JOIN courses c ON c.id = qs.course_id
+         WHERE pqs.quiz_set_id = ?'
+    );
+    $stmt->execute([$quizSetId]);
+    $share = $stmt->fetch();
+    return $share ?: null;
+}
+
+function public_quiz_share_by_token(string $shareToken, bool $includeInactive = false): ?array
+{
+    ensure_public_quiz_sharing_tables();
+    $shareToken = trim($shareToken);
+    if ($shareToken === '' || preg_match('/^[a-f0-9]{48}$/', $shareToken) !== 1) {
+        return null;
+    }
+
+    $sql = 'SELECT pqs.*, qs.title AS quiz_set_title, qs.description AS quiz_set_description,
+                   qs.shuffle_questions, qs.shuffle_choices, qs.course_id,
+                   c.title AS course_title,
+                   (SELECT COUNT(*) FROM quiz_set_questions qsq WHERE qsq.quiz_set_id = qs.id) AS question_count
+            FROM public_quiz_shares pqs
+            INNER JOIN quiz_sets qs ON qs.id = pqs.quiz_set_id
+            INNER JOIN courses c ON c.id = qs.course_id
+            WHERE pqs.share_token = ?';
+    if (!$includeInactive) {
+        $sql .= ' AND pqs.is_active = 1';
+    }
+    $stmt = db()->prepare($sql . ' LIMIT 1');
+    $stmt->execute([$shareToken]);
+    $share = $stmt->fetch();
+    return $share ?: null;
+}
+
+function save_public_quiz_share(int $quizSetId, array $data): array
+{
+    ensure_public_quiz_sharing_tables();
+    $title = trim((string) ($data['public_title'] ?? ''));
+    $welcomeMessage = trim((string) ($data['welcome_message'] ?? ''));
+    $passPercent = (float) ($data['pass_percent'] ?? 80);
+    if ($title === '' || mb_strlen($title, 'UTF-8') > 255) {
+        throw new RuntimeException('กรุณากรอกชื่อแบบทดสอบไม่เกิน 255 ตัวอักษร');
+    }
+    if (mb_strlen($welcomeMessage, 'UTF-8') > 1000) {
+        throw new RuntimeException('ข้อความต้อนรับต้องไม่เกิน 1,000 ตัวอักษร');
+    }
+    if ($passPercent < 1 || $passPercent > 100) {
+        throw new RuntimeException('เกณฑ์ผ่านต้องอยู่ระหว่าง 1 ถึง 100 เปอร์เซ็นต์');
+    }
+    $stmt = db()->prepare('SELECT COUNT(*) FROM quiz_set_questions WHERE quiz_set_id = ?');
+    $stmt->execute([$quizSetId]);
+    if ((int) $stmt->fetchColumn() === 0) {
+        throw new RuntimeException('กรุณาเพิ่มคำถามอย่างน้อย 1 ข้อก่อนสร้างลิงก์แชร์');
+    }
+
+    $current = public_quiz_share_for_set($quizSetId);
+    $shareToken = (string) ($current['share_token'] ?? generate_token(24));
+    $stmt = db()->prepare(
+        'INSERT INTO public_quiz_shares
+            (quiz_set_id, share_token, public_title, welcome_message, pass_percent, certificate_enabled, theme, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+            public_title = VALUES(public_title),
+            welcome_message = VALUES(welcome_message),
+            pass_percent = VALUES(pass_percent),
+            certificate_enabled = VALUES(certificate_enabled),
+            theme = VALUES(theme),
+            is_active = VALUES(is_active),
+            updated_at = NOW()'
+    );
+    $stmt->execute([
+        $quizSetId,
+        $shareToken,
+        $title,
+        $welcomeMessage,
+        round($passPercent, 2),
+        !empty($data['certificate_enabled']) ? 1 : 0,
+        normalize_public_quiz_theme((string) ($data['theme'] ?? 'ocean')),
+        !empty($data['is_active']) ? 1 : 0,
+    ]);
+
+    return (array) public_quiz_share_for_set($quizSetId);
+}
+
+function public_quiz_share_url(array $share): string
+{
+    return app_absolute_url('shared_quiz.php?share=' . rawurlencode((string) $share['share_token']));
+}
+
+function create_public_quiz_attempt(array $share, string $learnerName): array
+{
+    ensure_public_quiz_sharing_tables();
+    $learnerName = trim(preg_replace('/\s+/u', ' ', $learnerName) ?? $learnerName);
+    if ($learnerName === '' || mb_strlen($learnerName, 'UTF-8') > 255) {
+        throw new RuntimeException('กรุณากรอกชื่อ–นามสกุลให้ถูกต้อง');
+    }
+    if ((int) ($share['is_active'] ?? 0) !== 1) {
+        throw new RuntimeException('แบบทดสอบนี้ยังไม่เปิดให้ทำ');
+    }
+
+    $accessToken = generate_token(32);
+    $stmt = db()->prepare(
+        "INSERT INTO public_quiz_attempts (share_id, learner_name, access_token, status)
+         VALUES (?, ?, ?, 'started')"
+    );
+    $stmt->execute([(int) $share['id'], $learnerName, $accessToken]);
+    return (array) public_quiz_attempt((int) db()->lastInsertId(), $accessToken);
+}
+
+function public_quiz_attempt(int $attemptId, string $accessToken): ?array
+{
+    ensure_public_quiz_sharing_tables();
+    if ($attemptId <= 0 || preg_match('/^[a-f0-9]{64}$/', $accessToken) !== 1) {
+        return null;
+    }
+    $stmt = db()->prepare(
+        'SELECT pqa.*, pqs.quiz_set_id, pqs.share_token, pqs.public_title, pqs.welcome_message,
+                pqs.pass_percent, pqs.certificate_enabled, pqs.theme, pqs.is_active,
+                qs.course_id, qs.title AS quiz_set_title, qs.shuffle_questions, qs.shuffle_choices,
+                c.title AS course_title
+         FROM public_quiz_attempts pqa
+         INNER JOIN public_quiz_shares pqs ON pqs.id = pqa.share_id
+         INNER JOIN quiz_sets qs ON qs.id = pqs.quiz_set_id
+         INNER JOIN courses c ON c.id = qs.course_id
+         WHERE pqa.id = ? AND pqa.access_token = ?
+         LIMIT 1'
+    );
+    $stmt->execute([$attemptId, $accessToken]);
+    $attempt = $stmt->fetch();
+    return $attempt ?: null;
+}
+
+function public_quiz_attempt_url(array $share, array $attempt): string
+{
+    return 'shared_quiz.php?' . http_build_query([
+        'share' => $share['share_token'],
+        'attempt' => $attempt['id'],
+        'token' => $attempt['access_token'],
+    ]);
+}
+
+function submit_public_quiz_attempt(array $attempt, array $share, array $submitted): array
+{
+    ensure_public_quiz_sharing_tables();
+    $questions = quiz_set_questions((int) $share['quiz_set_id']);
+    if (!$questions) {
+        throw new RuntimeException('แบบทดสอบนี้ยังไม่มีคำถาม');
+    }
+    foreach ($questions as $question) {
+        $given = $submitted[(string) $question['id']] ?? '';
+        if ((is_array($given) && $given === []) || (!is_array($given) && trim((string) $given) === '')) {
+            throw new RuntimeException('กรุณาตอบคำถามให้ครบทุกข้อ');
+        }
+    }
+
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        $lock = $pdo->prepare('SELECT status FROM public_quiz_attempts WHERE id = ? FOR UPDATE');
+        $lock->execute([(int) $attempt['id']]);
+        if ((string) $lock->fetchColumn() !== 'started') {
+            throw new RuntimeException('แบบทดสอบนี้ถูกส่งคำตอบแล้ว');
+        }
+
+        $insert = $pdo->prepare(
+            'INSERT INTO public_quiz_answers (attempt_id, question_id, submitted_answers, is_correct)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE submitted_answers = VALUES(submitted_answers), is_correct = VALUES(is_correct)'
+        );
+        $correct = 0;
+        foreach ($questions as $question) {
+            $given = $submitted[(string) $question['id']];
+            $isCorrect = score_curriculum_question($question, $given);
+            $insert->execute([
+                (int) $attempt['id'],
+                (int) $question['id'],
+                json_encode($given, JSON_UNESCAPED_UNICODE),
+                $isCorrect ? 1 : 0,
+            ]);
+            if ($isCorrect) {
+                $correct++;
+            }
+        }
+        $total = count($questions);
+        $percent = round(($correct / $total) * 100, 2);
+        $passed = $percent >= (float) $share['pass_percent'];
+        $certificateCode = $passed && (int) $share['certificate_enabled'] === 1
+            ? 'SENA-Q-' . date('Ymd') . '-' . strtoupper(substr(generate_token(5), 0, 10))
+            : null;
+        $update = $pdo->prepare(
+            'UPDATE public_quiz_attempts
+             SET score = ?, total = ?, percent = ?, status = ?, certificate_code = ?, submitted_at = NOW()
+             WHERE id = ?'
+        );
+        $update->execute([
+            $correct,
+            $total,
+            $percent,
+            $passed ? 'passed' : 'submitted',
+            $certificateCode,
+            (int) $attempt['id'],
+        ]);
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    }
+
+    $saved = public_quiz_attempt((int) $attempt['id'], (string) $attempt['access_token']);
+    if (!$saved) {
+        throw new RuntimeException('ไม่สามารถอ่านผลแบบทดสอบได้');
+    }
+    return $saved;
 }
 
 function curriculum_items(int $courseId, ?int $attemptId = null): array
