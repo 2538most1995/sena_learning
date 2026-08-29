@@ -6,7 +6,7 @@ require_once __DIR__ . '/../includes/helpers.php';
 ensure_users_table();
 
 if (current_user()) {
-    redirect('../index.php');
+    redirect(post_login_redirect_path());
 }
 
 // Handle POST: email/password login
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     login_user($user);
     flash('เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ' . $user['display_name']);
-    redirect('../index.php');
+    redirect(post_login_redirect_path());
 }
 
 redirect('login.php');

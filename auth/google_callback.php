@@ -67,7 +67,7 @@ try {
     $user = upsert_google_user($profile);
     login_user($user);
     flash('เข้าสู่ระบบด้วย Google สำเร็จ ยินดีต้อนรับ ' . $user['display_name']);
-    redirect('../index.php');
+    redirect(post_login_redirect_path());
 } catch (Throwable $e) {
     error_log('Google login failed: ' . $e->getMessage());
     flash('ไม่สามารถเข้าสู่ระบบด้วย Google ได้ กรุณาลองใหม่', 'error');

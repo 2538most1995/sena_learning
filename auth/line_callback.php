@@ -68,7 +68,7 @@ try {
     $user = upsert_line_user($lineProfile);
     login_user($user);
     flash('เข้าสู่ระบบด้วย LINE สำเร็จ ยินดีต้อนรับ ' . $user['display_name']);
-    redirect('../index.php');
+    redirect(post_login_redirect_path());
 } catch (Throwable $e) {
     error_log('LINE login failed: ' . $e->getMessage());
     flash('ไม่สามารถเข้าสู่ระบบด้วย LINE ได้ กรุณาลองใหม่', 'error');

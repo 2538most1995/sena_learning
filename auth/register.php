@@ -6,7 +6,7 @@ require_once __DIR__ . '/../includes/helpers.php';
 ensure_users_table();
 
 if (current_user()) {
-    redirect('../index.php');
+    redirect(post_login_redirect_path());
 }
 
 $error = flash();
@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = register_general_user($email, $password, $name);
         login_user($user);
         flash('สมัครสมาชิกและเข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ' . $user['display_name']);
-        redirect('../index.php');
+        redirect(post_login_redirect_path());
     } catch (RuntimeException $e) {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();

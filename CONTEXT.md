@@ -56,7 +56,7 @@ public certificate URL for passed courses.
 | Route | Responsibility |
 | --- | --- |
 | `index.php` | Landing page, course list, cover thumbnails, progress summary |
-| `start.php` | Resume/create a member attempt or collect a public learner's full name and create a session-bound guest attempt |
+| `start.php` | Open a shared course directly, resume/create a member attempt, or collect a public learner's full name and create a session-bound guest attempt |
 | `quiz.php` | Render and score pre-tests or post-tests |
 | `lesson.php` | Render lessons and enforce tracked-video completion |
 | `mark_lesson.php` | Record lesson completion through JSON POST |
@@ -71,7 +71,7 @@ public certificate URL for passed courses.
 | Route | Responsibility |
 | --- | --- |
 | `admin/login.php` | Database-backed admin login |
-| `admin/index.php` | Admin dashboard |
+| `admin/index.php` | Admin dashboard, per-course direct share links, and downloadable QR Codes |
 | `admin/course_form.php` | Create and edit courses, URL covers, uploaded covers |
 | `admin/lessons.php` | Create, edit, and delete lessons |
 | `admin/questions.php` | Manage questions, imports, and choice-shuffle settings |

@@ -421,6 +421,36 @@ function app_absolute_url(string $path = ''): string
     return rtrim(APP_URL, '/') . '/' . ltrim($path, '/');
 }
 
+function course_share_url(int $courseId): string
+{
+    return app_absolute_url('start.php?' . http_build_query(['course_id' => $courseId]));
+}
+
+function remember_login_course(int $courseId): void
+{
+    if ($courseId <= 0) {
+        return;
+    }
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    $_SESSION['login_course_id'] = $courseId;
+}
+
+function post_login_redirect_path(string $default = '../index.php'): string
+{
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    $courseId = (int) ($_SESSION['login_course_id'] ?? 0);
+    unset($_SESSION['login_course_id']);
+
+    return $courseId > 0
+        ? '../start.php?' . http_build_query(['course_id' => $courseId])
+        : $default;
+}
+
 function learning_export_api_key(): string
 {
     return defined('LEARNING_EXPORT_API_KEY') ? trim((string) LEARNING_EXPORT_API_KEY) : '';

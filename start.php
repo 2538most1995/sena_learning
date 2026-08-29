@@ -18,8 +18,31 @@ if (!$course) {
 
 $loggedInUser = current_user();
 if (!$loggedInUser && !course_is_public($course)) {
+    remember_login_course($courseId);
     flash('หลักสูตรนี้สงวนสิทธิ์สำหรับสมาชิก กรุณาเข้าสู่ระบบก่อนเริ่มเรียน', 'error');
     redirect('auth/login.php');
+}
+
+if ($loggedInUser && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+    $latestAttempt = latest_user_attempts_by_course((int) $loggedInUser['id'])[$courseId] ?? null;
+    if ($latestAttempt) {
+        $destination = in_array((string) $latestAttempt['status'], ['posttest_done', 'passed'], true)
+            ? 'result.php'
+            : 'lesson.php';
+        redirect(attempt_url($destination, $latestAttempt));
+    }
+
+    try {
+        $accountName = trim((string) $loggedInUser['display_name']);
+        if ($accountName === '') {
+            throw new RuntimeException('กรุณาตรวจสอบชื่อในบัญชีผู้ใช้');
+        }
+        $attempt = get_or_create_attempt($courseId, (int) $loggedInUser['id'], $accountName);
+        redirect(attempt_url('lesson.php', $attempt));
+    } catch (RuntimeException $exception) {
+        flash($exception->getMessage(), 'error');
+        redirect('index.php');
+    }
 }
 
 $error = '';
@@ -49,10 +72,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $error = $exception->getMessage();
     }
-}
-
-if ($loggedInUser) {
-    redirect('index.php');
 }
 
 render_header('กรอกชื่อก่อนเริ่มเรียน', 'learn');

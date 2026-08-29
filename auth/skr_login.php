@@ -52,7 +52,7 @@ try {
     $user = upsert_skr_user($apiStudent);
     login_user($user);
     flash('เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ' . $user['display_name']);
-    redirect('../index.php');
+    redirect(post_login_redirect_path());
 } catch (Throwable $e) {
     flash('เกิดข้อผิดพลาดในการเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง', 'error');
     redirect('login.php?tab=student');

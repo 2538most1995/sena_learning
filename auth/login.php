@@ -7,8 +7,7 @@ ensure_users_table();
 
 $user = current_user();
 if ($user) {
-    // ถ้าล็อกอินอยู่แล้ว ไปหน้าแรก
-    redirect('../index.php');
+    redirect(post_login_redirect_path());
 }
 
 $tab   = (string) ($_GET['tab'] ?? 'general');
