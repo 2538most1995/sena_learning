@@ -99,6 +99,13 @@ function admin_attempt_filter_url(int $courseId, string $audience, array $filter
     return 'attempts.php?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
 }
 
+function admin_attempt_review_link(array $attempt): string
+{
+    $url = 'attempt_review.php?attempt=' . (int) $attempt['id'];
+    return '<a class="mt-1 block text-sm font-bold text-sea hover:underline" href="' . e($url)
+        . '" aria-label="' . e('ดูคำตอบรายข้อของ ' . admin_attempt_learner_name($attempt)) . '">ดูคำตอบรายข้อ</a>';
+}
+
 function admin_attempt_certificate_link(array $attempt): string
 {
     $certificateCode = trim((string) ($attempt['certificate_code'] ?? ''));
@@ -441,7 +448,7 @@ render_header($selectedCourse ? 'ผู้เรียน ' . (string) $selected
                                 <tbody>
                                     <?php foreach ($groupAttempts as $attempt): ?>
                                         <tr>
-                                            <td class="attempt-name-cell"><?= e(admin_attempt_learner_name($attempt)) ?></td>
+                                            <td class="attempt-name-cell"><?= e(admin_attempt_learner_name($attempt)) ?><?= admin_attempt_review_link($attempt) ?></td>
                                             <td><?= e((string) ($attempt['student_id'] ?? '-')) ?></td>
                                             <td><?= e(admin_attempt_student_level($attempt)) ?></td>
                                             <td class="text-slate-500"><?= e(admin_attempt_context_text($attempt) ?: '-') ?></td>
@@ -489,7 +496,7 @@ render_header($selectedCourse ? 'ผู้เรียน ' . (string) $selected
                         <tbody>
                             <?php foreach ($attempts as $attempt): ?>
                                 <tr>
-                                    <td class="attempt-name-cell"><?= e(admin_attempt_learner_name($attempt)) ?></td>
+                                    <td class="attempt-name-cell"><?= e(admin_attempt_learner_name($attempt)) ?><?= admin_attempt_review_link($attempt) ?></td>
                                     <td class="text-slate-500"><?= e((string) ($attempt['email'] ?: '-')) ?></td>
                                     <td><?= e(format_score($attempt['pre_score'] !== null ? (int) $attempt['pre_score'] : null, $attempt['pre_total'] !== null ? (int) $attempt['pre_total'] : null)) ?></td>
                                     <td><?= e(format_score($attempt['post_score'] !== null ? (int) $attempt['post_score'] : null, $attempt['post_total'] !== null ? (int) $attempt['post_total'] : null)) ?></td>
@@ -533,7 +540,7 @@ render_header($selectedCourse ? 'ผู้เรียน ' . (string) $selected
                             <?php foreach ($attempts as $attempt): ?>
                                 <?php $attemptAudience = (string) ($attempt['user_type'] ?? 'general'); ?>
                                 <tr>
-                                    <td class="attempt-name-cell"><?= e(admin_attempt_learner_name($attempt)) ?></td>
+                                    <td class="attempt-name-cell"><?= e(admin_attempt_learner_name($attempt)) ?><?= admin_attempt_review_link($attempt) ?></td>
                                     <td><span class="rounded-md px-2 py-1 text-xs font-bold <?= admin_attempt_audience_class($attemptAudience) ?>"><?= e(admin_attempt_audience_label($attemptAudience)) ?></span></td>
                                     <td class="text-slate-500"><?= e($attemptAudience === 'student' ? (string) ($attempt['student_id'] ?: '-') : (string) ($attempt['email'] ?: '-')) ?></td>
                                     <td><?= e($attemptAudience === 'student' ? admin_attempt_student_group($attempt) : '-') ?></td>

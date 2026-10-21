@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-function render_quiz_review(array $questions, string $title): void
+function render_quiz_review(array $questions, string $title, string $answerLabel = 'คำตอบของคุณ'): void
 {
     if (!$questions) {
         return;
@@ -24,7 +24,7 @@ function render_quiz_review(array $questions, string $title): void
                     <p class="quiz-review-prompt">ข้อที่ <?= $index + 1 ?> · <?= e((string) $question['prompt']) ?></p>
                     <p class="quiz-review-status"><?= $isCorrect ? '✓ ตอบถูก' : '✗ ตอบผิด' ?></p>
                     <dl>
-                        <dt>คำตอบของคุณ</dt>
+                        <dt><?= e($answerLabel) ?></dt>
                         <dd><?= e($given ? implode(' / ', array_map('strval', $given)) : 'ไม่ได้ตอบ') ?></dd>
                         <dt><?= $question['question_type'] === 'short_answer' ? 'คำตอบที่ยอมรับ' : 'คำตอบที่ถูกต้อง' ?></dt>
                         <dd><?= e(implode(' / ', array_map('strval', $correct))) ?></dd>

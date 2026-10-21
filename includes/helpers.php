@@ -2282,6 +2282,41 @@ function curriculum_quiz_review(array $attempt, array $item): array
     return $stmt->fetchAll();
 }
 
+// Admin routes must call require_admin() before reading saved learner answers.
+// Read progress directly so admins can also inspect legacy answers or answers
+// whose question has since been removed from the current quiz set.
+function admin_attempt_quiz_reviews(int $attemptId): array
+{
+    $stmt = db()->prepare(
+        'SELECT q.*, qp.submitted_answers, qp.is_correct, qp.completed_at,
+                qp.curriculum_item_id, qs.title AS quiz_set_title
+         FROM question_progress qp
+         INNER JOIN questions q ON q.id = qp.question_id
+         LEFT JOIN curriculum_items ci ON ci.id = qp.curriculum_item_id
+         LEFT JOIN curriculum_sections cs ON cs.id = ci.section_id
+         LEFT JOIN quiz_sets qs ON qs.id = ci.quiz_set_id
+         LEFT JOIN quiz_set_questions qsq ON qsq.quiz_set_id = ci.quiz_set_id AND qsq.question_id = q.id
+         WHERE qp.attempt_id = ? AND qp.completed_at IS NOT NULL
+         ORDER BY cs.sort_order, cs.id, ci.sort_order, ci.id,
+                  COALESCE(qsq.sort_order, q.sort_order), q.id, qp.id'
+    );
+    $stmt->execute([$attemptId]);
+    $groups = [];
+    foreach ($stmt->fetchAll() as $question) {
+        $itemId = (int) ($question['curriculum_item_id'] ?? 0);
+        $key = $itemId > 0 ? 'item:' . $itemId : 'legacy:' . $question['quiz_type'];
+        if (!isset($groups[$key])) {
+            $groups[$key] = [
+                'title' => $question['quiz_set_title']
+                    ?? ($question['quiz_type'] === 'pre' ? 'แบบทดสอบก่อนเรียน (ข้อมูลเดิม)' : 'แบบทดสอบหลังเรียน (ข้อมูลเดิม)'),
+                'questions' => [],
+            ];
+        }
+        $groups[$key]['questions'][] = $question;
+    }
+    return array_values($groups);
+}
+
 // The public route validates the attempt token and its share before calling.
 function public_quiz_review(array $attempt): array
 {

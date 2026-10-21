@@ -76,6 +76,7 @@ public certificate URL for passed courses.
 | `admin/lessons.php` | Create, edit, and delete lessons |
 | `admin/questions.php` | Manage questions, imports, and choice-shuffle settings |
 | `admin/attempts.php` | Review learners and scores |
+| `admin/attempt_review.php` | Admin-only per-question learner answers and correctness for one course attempt |
 | `admin/users.php` | Manage admin accounts, learner names, learner password resets, and learning totals |
 | `admin/certificate_settings.php` | Design certificates and reuse layouts |
 
@@ -209,6 +210,7 @@ Stores certificate assets, text, and JSON layout positions for each course.
 - Multiple-choice answers are sorted before comparison.
 - Short answers are trimmed, lowercased, and whitespace-normalized.
 - Completed curriculum quiz sets show a per-question review in the learning path and result page, with the learner's saved answer, correctness, accepted answers, and any explanation. Unfinished quiz placements do not reveal answers.
+- Admins can open saved answers from every learner tab in `admin/attempts.php`. The review groups answers by curriculum placement (including legacy records), uses stored correctness, and does not require or expose learner access tokens. Attempts with only aggregate scores show an empty state.
 - Submitted public quizzes show the same review, protected by the existing share and attempt tokens. Reviews use the quiz's stored question order, which may differ from the randomized order during the test.
 - Admins can publish a permanent no-login link for a quiz set and download its QR Code.
 - Public quiz attempts use their own access token and never bypass a normal course attempt or curriculum gate.
