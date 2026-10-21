@@ -207,6 +207,7 @@ Stores certificate assets, text, and JSON layout positions for each course.
 - Admins create central quiz sets and place those sets anywhere in the curriculum.
 - Legacy pre/post fields remain only for database and import compatibility.
 - Scoring is server-side in `score_curriculum_question()`.
+- Incomplete quiz submissions show links to unanswered questions and preserve entered answers. Curriculum and public quiz forms keep randomized question/choice order stable within the browser session; incomplete submissions never complete a quiz or unlock the next item.
 - Multiple-choice answers are sorted before comparison.
 - Short answers are trimmed, lowercased, and whitespace-normalized.
 - Completed curriculum quiz sets show a per-question review in the learning path and result page, with the learner's saved answer, correctness, accepted answers, and any explanation. Unfinished quiz placements do not reveal answers.

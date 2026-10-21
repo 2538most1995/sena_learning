@@ -3,12 +3,15 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/quiz_review.php';
+require_once __DIR__ . '/includes/quiz_form.php';
 
 $attempt = require_attempt();
 ensure_curriculum_tables();
 db()->prepare("UPDATE attempts SET status = 'learning', updated_at = NOW() WHERE id = ? AND status IN ('registered','pretest_done')")
     ->execute([(int) $attempt['id']]);
 
+$quizError = false;
+$submittedAnswers = is_array($_POST['answers'] ?? null) ? $_POST['answers'] : [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $item = curriculum_item_for_attempt($attempt, (int) post('item_id'));
@@ -33,14 +36,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } catch (Throwable $e) {
         flash($e->getMessage(), 'error');
+        $quizError = post('action') === 'answer_quiz_set' && isset($item) && $item
+            && (int) $item['is_accessible'] === 1 && $item['item_type'] === 'quiz_set';
     }
-    redirect(attempt_url('lesson.php', $attempt));
+    if (!$quizError) {
+        redirect(attempt_url('lesson.php', $attempt));
+    }
 }
 
 $summary = curriculum_summary($attempt);
 $items = $summary['items'];
 $selected = null;
-$requestedItemId = get_int('item');
+$requestedItemId = $quizError ? (int) post('item_id') : get_int('item');
 foreach ($items as $item) {
     if ((int) $item['id'] === $requestedItemId && ((int) $item['is_accessible'] === 1 || (int) $item['is_completed'] === 1)) {
         $selected = $item;
@@ -146,10 +153,10 @@ render_header('บทเรียน', 'learn');
             <article class="lesson-content learner-content-card">
                 <?php if ($selected['item_type'] === 'quiz_set'): ?>
                     <?php
-                    $quizQuestions = quiz_set_questions((int) $selected['quiz_set_id']);
-                    if ((int) ($selected['shuffle_questions'] ?? 0) === 1) {
-                        shuffle($quizQuestions);
-                    }
+                    $quizQuestions = quiz_form_questions(quiz_set_questions((int) $selected['quiz_set_id']),
+                        'course:' . $attempt['id'] . ':' . $selected['id'],
+                        !empty($selected['shuffle_questions']), !empty($selected['shuffle_choices']));
+                    $missing = $quizError ? quiz_form_missing($quizQuestions, $submittedAnswers) : [];
                     ?>
                     <div class="learner-question-type">ชุดข้อสอบกลาง · <?= count($quizQuestions) ?> ข้อ</div>
                     <h3><?= e($selected['title']) ?></h3>
@@ -160,22 +167,22 @@ render_header('บทเรียน', 'learn');
                         </div>
                         <?php render_quiz_review(curriculum_quiz_review($attempt, $selected), 'เฉลยแบบทดสอบ'); ?>
                     <?php endif; ?>
-                    <form method="post" class="mt-8">
+                    <form method="post" class="mt-8" data-quiz-form novalidate>
+                        <?php render_quiz_form_notice($missing); ?>
                         <input type="hidden" name="action" value="answer_quiz_set">
                         <input type="hidden" name="item_id" value="<?= (int) $selected['id'] ?>">
                         <div class="grid gap-6">
                         <?php foreach ($quizQuestions as $index => $question): ?>
                             <?php
                             $choices = json_decode((string) ($question['choices'] ?? '[]'), true) ?: [];
-                            if ((int) ($selected['shuffle_choices'] ?? 0) === 1) {
-                                shuffle($choices);
-                            }
+                            $given = $submittedAnswers[(int) $question['id']] ?? '';
+                            $isMultiple = $question['question_type'] === 'multiple_choice';
                             ?>
-                            <fieldset class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <fieldset id="quiz-question-<?= (int) $question['id'] ?>" data-quiz-question data-question-number="<?= $index + 1 ?>" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                                 <legend class="text-sm font-bold text-slate-500">ข้อที่ <?= $index + 1 ?></legend>
                                 <h4 class="mt-2 text-lg font-bold text-ink"><?= e($question['prompt']) ?></h4>
                                 <?php if ($question['question_type'] === 'short_answer'): ?>
-                                    <input name="answers[<?= (int) $question['id'] ?>]" required placeholder="พิมพ์คำตอบของคุณ" class="mt-4 w-full rounded-lg border border-slate-300 p-4 focus:border-sea focus:outline-none focus:ring-1 focus:ring-sea">
+                                    <input aria-label="คำตอบข้อที่ <?= $index + 1 ?>" value="<?= e(is_scalar($given) ? (string) $given : '') ?>" name="answers[<?= (int) $question['id'] ?>]" required placeholder="พิมพ์คำตอบของคุณ" class="mt-4 w-full rounded-lg border border-slate-300 p-4 focus:border-sea focus:outline-none focus:ring-1 focus:ring-sea">
                                 <?php else: ?>
                                     <div class="mt-4 grid gap-3">
                             <?php foreach ($choices as $choice): ?>
@@ -184,6 +191,7 @@ render_header('บทเรียน', 'learn');
                                         type="<?= $question['question_type'] === 'multiple_choice' ? 'checkbox' : 'radio' ?>"
                                         name="answers[<?= (int) $question['id'] ?>]<?= $question['question_type'] === 'multiple_choice' ? '[]' : '' ?>"
                                         value="<?= e((string) $choice) ?>"
+                                        <?= ($isMultiple ? is_array($given) && in_array((string) $choice, $given, true) : is_scalar($given) && (string) $given === (string) $choice) ? 'checked' : '' ?>
                                         class="h-4 w-4 text-sea border-slate-300 focus:ring-sea">
                                     <span class="text-slate-700"><?= e((string) $choice) ?></span>
                                 </label>
@@ -670,4 +678,5 @@ render_header('บทเรียน', 'learn');
     }
 })();
 </script>
+<script src="assets/js/quiz-form.js" defer></script>
 <?php render_footer(); ?>

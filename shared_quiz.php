@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/quiz_review.php';
+require_once __DIR__ . '/includes/quiz_form.php';
 
 if (!database_ready()) {
     render_empty_setup();
@@ -80,10 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $questions = [];
 if ($attempt && (string) $attempt['status'] === 'started') {
-    $questions = quiz_set_questions((int) $share['quiz_set_id']);
-    if ((int) $share['shuffle_questions'] === 1 && count($questions) > 1) {
-        shuffle($questions);
-    }
+    $questions = quiz_form_questions(quiz_set_questions((int) $share['quiz_set_id']),
+        'public:' . $attempt['id'], !empty($share['shuffle_questions']), !empty($share['shuffle_choices']));
 }
 
 $theme = normalize_public_quiz_theme((string) $share['theme']);
@@ -135,7 +134,8 @@ render_header($pageTitle, 'learn');
                 </div>
             </div>
         <?php elseif ((string) $attempt['status'] === 'started'): ?>
-            <form method="post" class="mt-6" novalidate>
+            <form method="post" class="mt-6" data-quiz-form novalidate>
+                <?php render_quiz_form_notice($error !== '' ? quiz_form_missing($questions, $submittedAnswers) : []); ?>
                 <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                 <input type="hidden" name="action" value="submit">
                 <input type="hidden" name="share" value="<?= e($shareToken) ?>">
@@ -150,12 +150,9 @@ render_header($pageTitle, 'learn');
                         <?php
                         $questionId = (int) $question['id'];
                         $choices = json_decode((string) ($question['choices'] ?? '[]'), true) ?: [];
-                        if ((int) $share['shuffle_choices'] === 1 && count($choices) > 1) {
-                            shuffle($choices);
-                        }
                         $given = $submittedAnswers[(string) $questionId] ?? null;
                         ?>
-                        <fieldset class="shared-quiz-question rounded-2xl bg-white p-5 shadow-sm sm:p-6">
+                        <fieldset id="quiz-question-<?= $questionId ?>" data-quiz-question data-question-number="<?= $index + 1 ?>" class="shared-quiz-question rounded-2xl bg-white p-5 shadow-sm sm:p-6">
                             <legend class="w-full px-0 text-lg font-extrabold leading-8 text-slate-900">
                                 <span class="shared-quiz-number mr-2 inline-grid h-8 min-w-8 place-items-center rounded-full px-2 text-sm text-white" aria-hidden="true"><?= $index + 1 ?></span>
                                 <?= e((string) $question['prompt']) ?>
@@ -214,4 +211,5 @@ render_header($pageTitle, 'learn');
         <?php endif; ?>
     </div>
 </section>
+<script src="assets/js/quiz-form.js" defer></script>
 <?php render_footer(); ?>
