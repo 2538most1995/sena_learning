@@ -208,6 +208,8 @@ Stores certificate assets, text, and JSON layout positions for each course.
 - Scoring is server-side in `score_curriculum_question()`.
 - Multiple-choice answers are sorted before comparison.
 - Short answers are trimmed, lowercased, and whitespace-normalized.
+- Completed curriculum quiz sets show a per-question review in the learning path and result page, with the learner's saved answer, correctness, accepted answers, and any explanation. Unfinished quiz placements do not reveal answers.
+- Submitted public quizzes show the same review, protected by the existing share and attempt tokens. Reviews use the quiz's stored question order, which may differ from the randomized order during the test.
 - Admins can publish a permanent no-login link for a quiz set and download its QR Code.
 - Public quiz attempts use their own access token and never bypass a normal course attempt or curriculum gate.
 - Public quizzes support five visual themes and may issue a certificate from the owner course template when the configured pass threshold is met.

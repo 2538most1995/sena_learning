@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/includes/layout.php';
+require_once __DIR__ . '/includes/quiz_review.php';
 
 $attempt = require_attempt();
 ensure_curriculum_tables();
@@ -128,6 +129,11 @@ render_header('บทเรียน', 'learn');
                 <p>คะแนนข้อสอบรวม <?= (int) $summary['question_correct'] ?>/<?= (int) $summary['question_total'] ?> ข้อ</p>
                 <a href="<?= e(attempt_url('result.php', $attempt)) ?>">ดูสรุปผลการเรียน</a>
             </div>
+            <?php foreach ($items as $reviewItem): ?>
+                <?php if ($reviewItem['item_type'] === 'quiz_set'): ?>
+                    <?php render_quiz_review(curriculum_quiz_review($attempt, $reviewItem), 'เฉลย · ' . $reviewItem['title']); ?>
+                <?php endif; ?>
+            <?php endforeach; ?>
         <?php elseif ($selected): ?>
             <div class="learner-content-heading">
                 <div>
@@ -152,6 +158,7 @@ render_header('บทเรียน', 'learn');
                         <div class="learner-answer-state is-correct">
                             ทำชุดข้อสอบนี้แล้ว ได้คะแนน <?= (int) $selected['quiz_question_correct'] ?>/<?= (int) $selected['quiz_question_total'] ?> ข้อ
                         </div>
+                        <?php render_quiz_review(curriculum_quiz_review($attempt, $selected), 'เฉลยแบบทดสอบ'); ?>
                     <?php endif; ?>
                     <form method="post" class="mt-8">
                         <input type="hidden" name="action" value="answer_quiz_set">

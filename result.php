@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/includes/layout.php';
+require_once __DIR__ . '/includes/quiz_review.php';
 
 $attempt = require_attempt();
 
@@ -63,5 +64,10 @@ render_header('ผลการเรียน', 'learn');
             <?php endif; ?>
         </div>
     </div>
+    <?php foreach ($summary['items'] as $reviewItem): ?>
+        <?php if ($reviewItem['item_type'] === 'quiz_set'): ?>
+            <?php render_quiz_review(curriculum_quiz_review($attempt, $reviewItem), 'เฉลย · ' . $reviewItem['title']); ?>
+        <?php endif; ?>
+    <?php endforeach; ?>
 </section>
 <?php render_footer(); ?>

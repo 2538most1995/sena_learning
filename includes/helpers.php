@@ -2261,6 +2261,43 @@ function curriculum_summary(array $attempt): array
     ];
 }
 
+// Call only with an attempt authorized by the learner route. Never reveal a
+// set's answers until every question at this curriculum placement is complete.
+function curriculum_quiz_review(array $attempt, array $item): array
+{
+    if ($item['item_type'] !== 'quiz_set' || (int) $item['is_completed'] !== 1
+        || (int) $item['course_id'] !== (int) $attempt['course_id']) {
+        return [];
+    }
+    $stmt = db()->prepare(
+        'SELECT q.*, qp.submitted_answers, qp.is_correct
+         FROM quiz_set_questions qsq
+         INNER JOIN questions q ON q.id = qsq.question_id
+         INNER JOIN question_progress qp ON qp.question_id = q.id
+            AND qp.attempt_id = ? AND (qp.curriculum_item_id = ? OR qp.curriculum_item_id IS NULL)
+         WHERE qsq.quiz_set_id = ? AND qp.completed_at IS NOT NULL
+         ORDER BY qsq.sort_order, qsq.question_id'
+    );
+    $stmt->execute([(int) $attempt['id'], (int) $item['id'], (int) $item['quiz_set_id']]);
+    return $stmt->fetchAll();
+}
+
+// The public route validates the attempt token and its share before calling.
+function public_quiz_review(array $attempt): array
+{
+    if (!in_array((string) $attempt['status'], ['submitted', 'passed'], true)) {
+        return [];
+    }
+    $stmt = db()->prepare(
+        'SELECT q.*, pqa.submitted_answers, pqa.is_correct
+         FROM public_quiz_answers pqa
+         INNER JOIN questions q ON q.id = pqa.question_id
+         WHERE pqa.attempt_id = ? ORDER BY pqa.id'
+    );
+    $stmt->execute([(int) $attempt['id']]);
+    return $stmt->fetchAll();
+}
+
 function score_curriculum_question(array $question, mixed $given): bool
 {
     $correctAnswers = json_decode((string) ($question['correct_answers'] ?? '[]'), true) ?: [];

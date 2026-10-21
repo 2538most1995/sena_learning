@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/includes/layout.php';
+require_once __DIR__ . '/includes/quiz_review.php';
 
 if (!database_ready()) {
     render_empty_setup();
@@ -209,6 +210,7 @@ render_header($pageTitle, 'learn');
                     <?php endif; ?>
                 </div>
             </div>
+            <?php render_quiz_review(public_quiz_review($attempt), 'เฉลยแบบทดสอบ'); ?>
         <?php endif; ?>
     </div>
 </section>

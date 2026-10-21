@@ -6473,3 +6473,35 @@ body.admin-area {
         padding: 4px 7px;
     }
 }
+
+/* Submitted quiz review: text labels accompany the correct/incorrect colors. */
+.quiz-review {
+    margin-top: 1.5rem;
+    padding: clamp(1rem, 3vw, 1.5rem);
+    border: 1px solid #cbd5e1;
+    border-radius: 1rem;
+    background: #fff;
+    color: #102033;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+.quiz-review > summary {
+    padding: .5rem 0;
+    font-size: 1.125rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+.quiz-review > summary:focus-visible {
+    outline: 3px solid #0f766e;
+    outline-offset: 4px;
+}
+.quiz-review-note { margin: .75rem 0; color: #475569; font-size: .875rem; }
+.quiz-review-list { display: grid; gap: 1rem; padding: 0; list-style: none; }
+.quiz-review-question { padding: 1rem; border: 1px solid #cbd5e1; border-radius: .75rem; }
+.quiz-review-question.is-incorrect { border-color: #fca5a5; background: #fff7f7; }
+.quiz-review-prompt { font-weight: 700; line-height: 1.7; white-space: pre-line; }
+.quiz-review-status { margin: .5rem 0; font-weight: 800; color: #047857; }
+.quiz-review-question.is-incorrect .quiz-review-status { color: #b91c1c; }
+.quiz-review-question dt { margin-top: .75rem; font-weight: 700; }
+.quiz-review-question dd { margin: .25rem 0 0; white-space: pre-line; }
+.quiz-review-explanation { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid #cbd5e1; white-space: pre-line; }
